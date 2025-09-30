@@ -1,0 +1,255 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MishpuchaTech — Локальный прототип</title>
+<style>
+  :root{
+    --bg:#FDF6F0; --primary:#E08E45; --text:#2b2b2b; --muted:#6b6b6b; --card:#fff; --brown:#A65A2E;
+  }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,Inter,Segoe UI,Roboto,Helvetica,Arial}
+  .app{max-width:420px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;border-left:1px solid #eee;border-right:1px solid #eee}
+  .top{position:sticky;top:0;background:var(--bg);padding:12px 16px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between}
+  .title{font-weight:700}
+  .btn{border:0;padding:10px 14px;border-radius:14px;background:var(--primary);color:#fff;font-weight:600}
+  .btn.ghost{background:#fff;color:var(--brown);border:1px solid var(--primary)}
+  .btn.small{padding:8px 10px;border-radius:10px;font-size:12px}
+  .content{padding:16px 16px 90px}
+  .card{background:var(--card);border:1px solid #eee;border-radius:16px;box-shadow:0 2px 6px rgba(0,0,0,.06)}
+  .p16{padding:16px} .grid{display:grid;gap:12px} .g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)}
+  .muted{color:var(--muted)} .row{display:flex;gap:10px;align-items:center}
+  .nav{position:sticky;bottom:0;display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid #eee;background:#fff}
+  .nav button{padding:10px 6px;background:none;border:0} .nav .on{color:var(--brown);font-weight:700}
+  .chip{background:#faf7f4;border:1px solid #eee;border-radius:999px;padding:6px 10px;font-size:12px}
+  .list-item{display:flex;justify-content:space-between;align-items:center;border:1px solid #eee;border-radius:12px;background:#fff;padding:12px}
+  .media img{width:100%;height:90px;object-fit:cover;border-radius:12px}
+  .input{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:12px}
+  .sp8{height:8px} .sp12{height:12px} .sp16{height:16px}
+  a{text-decoration:none;color:var(--brown)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <button id="backBtn" class="btn small" style="display:none;background:#fff;color:#333;border:1px solid #ddd">Назад</button>
+    <div class="title" id="topTitle">MishpuchaTech</div>
+    <span style="width:72px;text-align:right" class="muted" id="topRight"> </span>
+  </div>
+
+  <div id="screen" class="content"></div>
+
+  <div class="nav" id="nav"></div>
+</div>
+
+<script>
+const S = {};
+function $(sel){return document.querySelector(sel)}
+function setTitle(t){$('#topTitle').textContent=t}
+function setBack(show, cb){const b=$('#backBtn'); b.style.display=show?'inline-block':'none'; b.onclick=cb||null}
+function setRight(html){$('#topRight').innerHTML=html||''}
+function setNav(active){const tabs=[['home','Главная'],['tree','Древо'],['calendar','Календарь'],['groups','Группы'],['profile','Профиль']]
+  $('#nav').innerHTML = tabs.map(([k,l])=>`<button data-k="${k}" class="${active===k?'on':''}">${l}</button>`).join('');
+  [...document.querySelectorAll('#nav button')].forEach(b=>b.onclick=()=>route(b.dataset.k));
+}
+function view(html){$('#screen').innerHTML=html}
+
+function route(name){ location.hash = name; render(name) }
+window.addEventListener('hashchange',()=>render(location.hash.replace('#','')||'home'));
+
+function Home(){
+  setTitle('MishpuchaTech'); setBack(false); setRight('');
+  view(`
+    <div class="grid g2">
+      <div class="card p16">
+        <div class="row"><img src="https://images.unsplash.com/photo-1547721064-da6cfb341d50?q=80&w=80&auto=format&fit=crop" style="width:48px;height:48px;border-radius:999px;object-fit:cover"><div><div><b>Давид Абрамов</b></div><div class="muted">Род: Абрамовы • Москва</div></div></div>
+      </div>
+      <button class="card p16" onclick="route('wedding')"><b>Свадьба</b><div class="muted">Создать приглашение</div></button>
+      <button class="card p16" onclick="route('brit')"><b>Брит Мила</b><div class="muted">Обрезание мальчика</div></button>
+      <button class="card p16" onclick="route('bar')"><b>Бар Мицва</b><div class="muted">13 лет: молитва + банкет</div></button>
+      <button class="card p16" onclick="route('mourning')"><b>Траур</b><div class="muted">Похороны • 7 • 40 • год</div></button>
+      <button class="card p16" onclick="route('synagogue')"><b>Синагоги</b><div class="muted">Расписания и подписки</div></button>
+      <button class="card p16" onclick="route('feed')"><b>Лента</b><div class="muted">События семьи и общины</div></button>
+    </div>
+  `);
+  setNav('home');
+}
+
+function Tree(){
+  setTitle('Семейное древо'); setBack(false); setRight('');
+  view(`
+    <div class="card p16">
+      <div class="muted">Классическое отображение</div>
+      <div class="sp12"></div>
+      <div class="grid g3">
+        ${['Дедушка','Бабушка','Отец','Мать','Я','Сестра','Брат'].map(n=>`<div class="chip" style="text-align:center">${n}</div>`).join('')}
+      </div>
+      <div class="sp16"></div>
+      <button class="btn">+ Добавить родственника</button>
+    </div>
+  `);
+  setNav('tree');
+}
+
+function Groups(){
+  setTitle('Группы'); setBack(false); setRight('');
+  view(`
+    <div class="grid">
+      ${[
+        ['Семья Абрамовых','Фото со встречи у бабушки'],
+        ['Подготовка свадьбы','Закрываем список гостей'],
+        ['Соседи дача','Субботняя мангал-встреча']
+      ].map(([t,s])=>`<div class="list-item" onclick="route('chat')"><div><div><b>${t}</b></div><div class="muted">${s}</div></div><span>›</span></div>`).join('')}
+    </div>
+  `);
+  setNav('groups');
+}
+
+function Chat(){
+  setTitle('Семья Абрамовых'); setBack(true,()=>history.back()); setRight('<span class="muted">альбом</span>');
+  const photos=[
+    "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=300&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1529336953121-c8f6c0f0f68f?q=80&w=300&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=300&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1544006659-f0b21884ce1d?q=80&w=300&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=300&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?q=80&w=300&auto=format&fit=crop"
+  ];
+  view(`
+    <div class="grid">
+      <div>
+        <div class="muted">Медиа</div>
+        <div class="sp8"></div>
+        <div class="grid g3 media">${photos.map(src=>`<img src="${src}">`).join('')}</div>
+      </div>
+      <div class="card p16">
+        <div class="muted">Сара</div>
+        Shabbat Shalom!
+      </div>
+      <div class="card p16">
+        <div class="muted">Даниэль</div>
+        Доброе утро ☀️
+      </div>
+      <div class="row">
+        <input class="input" placeholder="Сообщение" id="msg">
+        <button class="btn small" onclick="(function(){var m=document.getElementById('msg'); if(!m.value) return; const d=document.createElement('div'); d.className='card p16'; d.innerHTML='<div class=muted>Вы</div>'+m.value; document.querySelector('.grid').appendChild(d); m.value='';})()">Отправить</button>
+      </div>
+    </div>
+  `);
+  setNav('groups');
+}
+
+function Calendar(){
+  setTitle('Календарь'); setBack(false); setRight('');
+  view(`
+    <div class="grid">
+      <div class="list-item" onclick="route('wedding')"><div><b>Свадьба Яэль & Давид</b><div class="muted">15 августа • 17:00 • Парадайз</div></div><span>›</span></div>
+      <div class="list-item" onclick="route('brit')"><div><b>Брит Мила — Аарон</b><div class="muted">22 августа • 09:30 • Синагога №3</div></div><span>›</span></div>
+      <div class="list-item" onclick="route('bar')"><div><b>Бар Мицва — Ноах</b><div class="muted">5 сентября • 10:00 молитва • 13:00 банкет</div></div><span>›</span></div>
+      <div class="list-item"><div><b>Пурим</b><div class="muted">Общинное мероприятие</div></div></div>
+    </div>
+  `);
+  setNav('calendar');
+}
+
+function RSVPTemplate(title, subtitle){
+  setTitle(title); setBack(true,()=>history.back()); setRight('');
+  view(`
+    <div class="card p16 grid">
+      <div class="row">
+        <img src="https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=160&auto=format&fit=crop" style="width:64px;height:64px;border-radius:999px;object-fit:cover">
+        <div><div class="title" style="font-size:18px">${title}</div><div class="muted">${subtitle}</div></div>
+      </div>
+      <div class="grid g3">
+        <button class="btn ghost">Иду</button>
+        <button class="btn ghost">Не иду</button>
+        <button class="btn ghost">Под вопросом</button>
+      </div>
+      <a href="#" onclick="route('chat');return false" class="row"><span>Открыть чат события</span> ›</a>
+    </div>
+  `);
+}
+function Wedding(){ RSVPTemplate('Свадьба: Яэль & Давид','15 августа • 17:00 • Парадайз, Москва') }
+function Brit(){ RSVPTemplate('Брит Мила: Аарон','22 августа • 09:30 • Синагога №3') }
+function Bar(){  RSVPTemplate('Бар Мицва: Ноах','5 сентября • молитва 10:00 • банкет 13:00') }
+
+function Mourning(){
+  setTitle('Траур'); setBack(true,()=>history.back()); setRight('');
+  view(`
+    <div class="grid">
+      <div class="card p16"><div class="muted">Внесено раввином</div><div class="sp8"></div><b>Похороны</b><div class="muted">Сегодня • 15:00 • Старое кладбище</div></div>
+      <div class="grid g3">
+        <div class="card p16"><b>Шива (7)</b><div>22.04</div></div>
+        <div class="card p16"><b>40 дней</b><div>25.05</div></div>
+        <div class="card p16"><b>Годовщина</b><div>12.04.26</div></div>
+      </div>
+      <a href="#" onclick="route('chat');return false" class="row"><span>Открыть чат траура</span> ›</a>
+    </div>
+  `);
+  setNav('calendar');
+}
+
+function Synagogue(){
+  setTitle('Синагога Дербентская'); setBack(true,()=>history.back()); setRight('<a href="#" id="toggleAdm">Режим раввина</a>');
+  let admin=false;
+  function draw(){
+    view(`
+      <div class="grid">
+        ${[['Шахарит','08:30'],['Минха','18:30'],['Арвит','19:10']].map(([n,t])=>`
+          <div class="list-item">
+            <div><b>${n}</b></div>
+            ${admin ? `<input value="${t}" class="input" style="width:90px"> <button class="btn small">Сохранить</button>` : `<div class="muted">${t}</div>`}
+          </div>`).join('')}
+        <button class="btn">Подписаться на напоминания</button>
+      </div>
+    `);
+  }
+  draw();
+  $('#toggleAdm').onclick=(e)=>{e.preventDefault(); admin=!admin; $('#toggleAdm').textContent = admin?'Режим прихожанина':'Режим раввина'; draw();}
+  setNav('home');
+}
+
+function Feed(){
+  setTitle('Лента'); setBack(false); setRight('');
+  view(`
+    <div class="grid">
+      ${[['Сегодня','Поздравьте Яэль и Давида со свадьбой'],['Завтра','Годовщина у семьи Давидовых'],['Вчера','Фото с Бар Мицвы']].map(([d,t])=>`
+        <div class="card p16"><div class="muted">${d}</div><div><b>${t}</b></div></div>`).join('')}
+    </div>
+  `);
+  setNav('home');
+}
+
+function Profile(){
+  setTitle('Профиль'); setBack(false); setRight('');
+  view(`
+    <div class="card p16 grid">
+      <div class="row"><img src="https://images.unsplash.com/photo-1547721064-da6cfb341d50?q=80&w=80&auto=format&fit=crop" style="width:56px;height:56px;border-radius:999px;object-fit:cover"><div><div><b>Давид Абрамов</b></div><div class="muted">Род: Абрамовы • Москва</div></div></div>
+      <button class="btn">Редактировать</button>
+    </div>
+  `);
+  setNav('profile');
+}
+
+function render(name){
+  const page = name || 'home';
+  setBack(false); setRight('');
+  if(page==='home') Home();
+  else if(page==='tree') Tree();
+  else if(page==='calendar') Calendar();
+  else if(page==='groups') Groups();
+  else if(page==='profile') Profile();
+  else if(page==='chat') Chat();
+  else if(page==='wedding') Wedding();
+  else if(page==='brit') Brit();
+  else if(page==='bar') Bar();
+  else if(page==='mourning') Mourning();
+  else if(page==='synagogue') Synagogue();
+  else if(page==='feed') Feed();
+  else Home();
+}
+render(location.hash.replace('#','')||'home');
+</script>
+</body>
+</html>
