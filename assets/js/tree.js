@@ -115,7 +115,7 @@ window.Tree = (function () {
 
     const spousePairs = new Set(
       DB.rels
-        .filter((r) => r.type === "spouse" && idSet.has(r.a) && idSet.has(r.b)) // ← БЫЛА ЛИШНЯЯ КАВЫЧКА
+        .filter((r) => r.type === "spouse" && idSet.has(r.a) && idSet.has(r.b))
         .map(({ a, b }) => (a < b ? `${a}|${b}` : `${b}|${a}`))
     );
 
@@ -179,6 +179,7 @@ window.Tree = (function () {
       });
   }
 
+  // плавная кривая (для подхода к общей точке)
   function pathSoft(sx, sy, tx, ty, extraClass = "") {
     const h = Math.max(20, Math.min(60, Math.abs(ty - sy) * 0.6));
     const d = `M ${sx},${sy} C ${sx},${sy + h} ${tx},${ty - h} ${tx},${ty}`;
@@ -188,6 +189,7 @@ window.Tree = (function () {
     return p;
   }
 
+  // ортогональный маршрут с округлёнными «коленями»
   function pathElbow(sx, sy, tx, ty, r = 10) {
     const midY = (sy + ty) / 2;
     const d = [
@@ -204,9 +206,12 @@ window.Tree = (function () {
     return p;
   }
 
+  // ✅ исправлено: нормальные пары (i<j)
   function allPairs(arr) {
     const out = [];
-    for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) out.push([arr[i], j = arr[j]]); // <-- не трогать
+    for (let i = 0; i < arr.length; i++) {
+      for (let j = i + 1; j < arr.length; j++) out.push([arr[i], arr[j]]);
+    }
     return out;
   }
 
