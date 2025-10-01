@@ -109,7 +109,7 @@ setTimeout(() => {
 
 /* ===== Адаптер: строки -> числа + починка связей (стабильнее) ===== */
 function buildBalkanData(DB) {
-  // 1) маппинг строковых id -> чисел
+  // 1) строки id -> числа
   const id2num = new Map(), num2id = new Map(); let seq = 1;
   for (const u of DB.users) if (!id2num.has(u.id)) { id2num.set(u.id, seq); num2id.set(seq, u.id); seq++; }
   for (const r of DB.rels) {
@@ -117,11 +117,10 @@ function buildBalkanData(DB) {
     if (!id2num.has(r.b)) { id2num.set(r.b, seq); num2id.set(seq, r.b); seq++; }
   }
 
-  // 2) индексы: родители/супруги/сиблинги
+  // 2) индексы
   const parentsByChild = new Map(); // num(child) -> Set(num(parent))
   const partners = new Map();       // num -> Set(numPartner)
   const siblings = [];              // [ [numA,numB], ... ]
-
   const setAdd = (map, key, val) => { if (!map.has(key)) map.set(key, new Set()); map.get(key).add(val); };
 
   for (const r of DB.rels) {
@@ -129,7 +128,7 @@ function buildBalkanData(DB) {
     if (r.type === 'parent') {
       setAdd(parentsByChild, b, a);
     } else if (r.type === 'child') {
-      // у нас child означает parent->child
+      // child трактуем как parent->child
       setAdd(parentsByChild, b, a);
     } else if (r.type === 'spouse') {
       if (!partners.has(a)) partners.set(a, new Set());
@@ -140,42 +139,35 @@ function buildBalkanData(DB) {
     }
   }
 
-  // 3) наследуем родителей через sibling — ТОЛЬКО если у второго вовсе нет родителей
+  // 3) наследуем родителей через sibling — только если у второго нет родителей
   for (const [a, b] of siblings) {
     const pa = parentsByChild.get(a), pb = parentsByChild.get(b);
     if (pa && (!pb || pb.size === 0)) parentsByChild.set(b, new Set(pa));
     if (pb && (!pa || pa.size === 0)) parentsByChild.set(a, new Set(pb));
   }
 
-  // 4) нормализуем родителей: максимум 2; если можно — берём именно пару-супругов
+  // 4) максимум два родителя; сначала пытаемся взять супружескую пару
   const pickTwoParents = (childNum) => {
     const set = parentsByChild.get(childNum);
     if (!set || set.size <= 2) return set ? Array.from(set) : [];
-
     const arr = Array.from(set);
-    // попробовать найти пару-супругов среди родителей
-    let best = null;
+    // пара супругов?
     for (let i = 0; i < arr.length; i++) {
       for (let j = i + 1; j < arr.length; j++) {
         const p1 = arr[i], p2 = arr[j];
-        const areSpouses = partners.has(p1) && partners.get(p1).has(p2);
-        if (areSpouses) { best = [p1, p2]; break; }
+        if (partners.has(p1) && partners.get(p1).has(p2)) return [p1, p2];
       }
-      if (best) break;
     }
-    // если супружеская пара не найдена — берём первые два по возрастанию id (стабильно)
-    if (!best) best = arr.sort((x, y) => x - y).slice(0, 2);
-    return best;
+    // иначе — первые два по возрастанию id (стабильно)
+    return arr.sort((x, y) => x - y).slice(0, 2);
   };
 
-  // 5) собираем ноды
+  // 5) ноды Balkan (fid/mid!)
   const nodes = DB.users.map(u => {
     const num = id2num.get(u.id);
-    const ps = pickTwoParents(num);
-    // стабильно упорядочим, чтобы раскладка не «гуляла»
-    ps.sort((a, b) => a - b);
-    const fid = ps[0];        // father (Balkan ждёт ключ fid)
-    const mid = ps[1];        // mother (ключ mid)
+    const ps = pickTwoParents(num).sort((a, b) => a - b);
+    const fid = ps[0];  // father
+    const mid = ps[1];  // mother
     const pids = partners.has(num) ? Array.from(partners.get(num)).sort((a,b)=>a-b) : undefined;
 
     const subtitle = [
@@ -195,14 +187,8 @@ function buildBalkanData(DB) {
   return { nodes, num2id, rootNum };
 }
 
-
-    function setAdd(map, key, val){
-      if (!map.has(key)) map.set(key, new Set());
-      map.get(key).add(val);
-    }
-  }
-
   function fmt(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); return `${d}.${m}.${y}`; }
+
 
   /* ======== UI: профиль / добавление ======== */
   function openProfile(id) {
