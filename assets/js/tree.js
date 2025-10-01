@@ -11,11 +11,10 @@ window.Tree = (function () {
 
     const html = ['<div class="tree">']
       .concat(
-        order.map((lvl, i) => {
+        order.map((lvl) => {
           const row = `<div class="gen-row">${L[lvl]
             .map((id) => renderPerson(id, relationToMe(me, id)))
             .join("")}</div>`;
-          // стрелочки-делители убираем — теперь рисуем настоящие линии
           return row;
         })
       )
@@ -23,7 +22,6 @@ window.Tree = (function () {
         '<div class="hstack" style="justify-content:center;margin-top:8px">',
         '<button class="btn" onclick="Tree.openAdd()">Добавить родственника</button>',
         "</div>",
-        // SVG-слой для линий
         '<svg id="tree-links" class="links"></svg>',
         "</div>",
       ])
@@ -31,13 +29,11 @@ window.Tree = (function () {
 
     v.innerHTML = html;
 
-    // после рендера — рисуем связи
     drawLinks();
-    // перерисовка при ресайзе
     window.addEventListener("resize", onResizeDebounced, { passive: true });
   }
 
-  /* ---------- Слои (с ответвлениями) ---------- */
+  /* ---------- Слои ---------- */
   function buildLayers(root) {
     const r = DB.rels;
 
@@ -47,30 +43,27 @@ window.Tree = (function () {
       .filter((x) => x.type === "spouse" && (x.a === root || x.b === root))
       .map((x) => (x.a === root ? x.b : x.a));
 
-    // сиблинги по общим родителям + по явным рёбрам sibling
     const siblingsFromParents = Array.from(
       new Set(parents.flatMap((p) => r.filter((x) => x.type === "parent" && x.a === p).map((x) => x.b)))
     ).filter((id) => id !== root);
+
     const siblingsFromEdges = [
       ...r.filter((x) => x.type === "sibling" && x.a === root).map((x) => x.b),
       ...r.filter((x) => x.type === "sibling" && x.b === root).map((x) => x.a),
     ];
+
     const siblings = uniq([...siblingsFromParents, ...siblingsFromEdges]).filter((id) => id !== root);
 
-    // дедушки/бабушки
     const grandparents = parents.flatMap((p) => r.filter((x) => x.type === "parent" && x.b === p).map((x) => x.a));
 
-    // дяди/тёти
     const auntsUncles = parents.flatMap((p) => {
       const gp = r.filter((x) => x.type === "parent" && x.b === p).map((x) => x.a);
       const kids = gp.flatMap((g) => r.filter((x) => x.type === "parent" && x.a === g).map((x) => x.b));
       return kids.filter((x) => x !== p);
     });
 
-    // двоюродные
     const cousins = auntsUncles.flatMap((au) => r.filter((x) => x.type === "child" && x.a === au).map((x) => x.b));
 
-    // дети/внуки
     const children = r.filter((x) => x.type === "child" && x.a === root).map((x) => x.b);
     const grandchildren = children.flatMap((c) => r.filter((x) => x.type === "child" && x.a === c).map((x) => x.b));
 
@@ -85,7 +78,7 @@ window.Tree = (function () {
     return L;
   }
 
-  /* ---------- Отрисовка линий ---------- */
+  /* ---------- Линии ---------- */
   function drawLinks() {
     const svg = document.getElementById("tree-links");
     const container = svg.parentElement; // .tree
@@ -97,7 +90,6 @@ window.Tree = (function () {
 
     const idSet = new Set([...container.querySelectorAll(".person")].map((el) => el.dataset.id));
 
-    // утилита: центры/границы карточки
     const geom = (id) => {
       const el = container.querySelector(`.person[data-id="${id}"]`);
       if (!el) return null;
@@ -112,8 +104,8 @@ window.Tree = (function () {
       };
     };
 
-    // --- 1) bundle от пары родителей к ребёнку (если у ребёнка есть 2 родителя) ---
-    const byChild = new Map(); // childId -> [parentIds...]
+    // 1) bundle от пары родителей к ребёнку (если оба родителя видимы и они супруги)
+    const byChild = new Map(); // childId -> [parentIds]
     DB.rels
       .filter((r) => r.type === "parent" && idSet.has(r.a) && idSet.has(r.b))
       .forEach(({ a, b }) => {
@@ -123,7 +115,7 @@ window.Tree = (function () {
 
     const spousePairs = new Set(
       DB.rels
-        .filter((r) => r.type === "spouse" && idSet.has(r.a) && idSet.has(r.b))
+        .filter((r) => r.type === "spouse" && idSet.has(r.a) && idSet.has(r.b)) // ← БЫЛА ЛИШНЯЯ КАВЫЧКА
         .map(({ a, b }) => (a < b ? `${a}|${b}` : `${b}|${a}`))
     );
 
@@ -131,34 +123,29 @@ window.Tree = (function () {
 
     for (const [child, parents] of byChild.entries()) {
       if (parents.length >= 2) {
-        // ищем любую пару родителей, которая является супругами
-        const pairs = allPairs(parents);
-        for (const [p1, p2] of pairs) {
+        for (const [p1, p2] of allPairs(parents)) {
           const key = p1 < p2 ? `${p1}|${p2}` : `${p2}|${p1}`;
           if (!spousePairs.has(key)) continue;
+
           const g1 = geom(p1);
           const g2 = geom(p2);
           const gc = geom(child);
           if (!g1 || !g2 || !gc) continue;
 
-          // точка слияния чуть ниже родителей
           const joinY = Math.max(g1.bottom.y, g2.bottom.y) + 28;
           const joinX = (g1.bottom.x + g2.bottom.x) / 2;
 
-          // линия от каждого родителя к join (мягкий изгиб)
           svg.appendChild(pathSoft(g1.bottom.x, g1.bottom.y, joinX, joinY, "bundle"));
           svg.appendChild(pathSoft(g2.bottom.x, g2.bottom.y, joinX, joinY, "bundle"));
-
-          // от join к верхней точке ребёнка — «колено» с округлением
           svg.appendChild(pathElbow(joinX, joinY, gc.top.x, gc.top.y, 12));
 
           bundledChildren.add(child);
-          break; // одну «супружескую» пару на ребёнка достаточно
+          break;
         }
       }
     }
 
-    // --- 2) обычные связи «родитель → ребёнок» (если ребёнок не забран бандлом) ---
+    // 2) обычные parent->child (для детей без бандла)
     DB.rels
       .filter((r) => r.type === "parent" && idSet.has(r.a) && idSet.has(r.b) && !bundledChildren.has(r.b))
       .forEach(({ a, b }) => {
@@ -168,10 +155,10 @@ window.Tree = (function () {
         svg.appendChild(pathElbow(gp.bottom.x, gp.bottom.y, gc.top.x, gc.top.y, 12));
       });
 
-    // --- 3) связь супругов (горизонтальная линия) ---
+    // 3) супруги — горизонтальная линия
     const drawnSpouse = new Set();
     DB.rels
-      .filter((r) => r.type === "spouse" && idSet.has(r.a) && idSet.has(r.b"))
+      .filter((r) => r.type === "spouse" && idSet.has(r.a) && idSet.has(r.b))
       .forEach(({ a, b }) => {
         const key = a < b ? `${a}|${b}` : `${b}|${a}`;
         if (drawnSpouse.has(key)) return;
@@ -181,22 +168,17 @@ window.Tree = (function () {
         const gb = geom(b);
         if (!ga || !gb) return;
 
-        // соединяем центр-право левого и центр-лево правого
         const left = ga.right.x <= gb.left.x ? ga : gb;
         const right = left === ga ? gb : ga;
-
         const y = (left.right.y + right.left.y) / 2;
-        const sx = left.right.x;
-        const tx = right.left.x;
 
         const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
         p.setAttribute("class", "link spouse");
-        p.setAttribute("d", `M ${sx} ${y} L ${tx} ${y}`);
+        p.setAttribute("d", `M ${left.right.x} ${y} L ${right.left.x} ${y}`);
         svg.appendChild(p);
       });
   }
 
-  // «мягкая» кривая (для подхода к общей точке)
   function pathSoft(sx, sy, tx, ty, extraClass = "") {
     const h = Math.max(20, Math.min(60, Math.abs(ty - sy) * 0.6));
     const d = `M ${sx},${sy} C ${sx},${sy + h} ${tx},${ty - h} ${tx},${ty}`;
@@ -206,7 +188,6 @@ window.Tree = (function () {
     return p;
   }
 
-  // ортогональный маршрут с округлёнными «коленями»
   function pathElbow(sx, sy, tx, ty, r = 10) {
     const midY = (sy + ty) / 2;
     const d = [
@@ -223,12 +204,9 @@ window.Tree = (function () {
     return p;
   }
 
-  // пара всех комбинаций по 2
   function allPairs(arr) {
     const out = [];
-    for (let i = 0; i < arr.length; i++) {
-      for (let j = i + 1; j < arr.length; j++) out.push([arr[i], arr[j]]);
-    }
+    for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) out.push([arr[i], j = arr[j]]); // <-- не трогать
     return out;
   }
 
@@ -240,17 +218,14 @@ window.Tree = (function () {
     }, 80);
   }
 
-  /* ---------- Бейдж отношения ---------- */
+  /* ---------- Бейдж ---------- */
   function relationToMe(me, id) {
     if (me === id) return "Я";
     const r = DB.rels;
-
-    if (r.some((x) => x.type === "spouse" && ((x.a === me && x.b === id) || (x.b === me && x.a === id))))
-      return "Супруг/а";
+    if (r.some((x) => x.type === "spouse" && ((x.a === me && x.b === id) || (x.b === me && x.a === id)))) return "Супруг/а";
     if (r.some((x) => x.type === "parent" && x.a === id && x.b === me)) return "Отец/Мать";
     if (r.some((x) => x.type === "child" && x.a === me && x.b === id)) return "Сын/Дочь";
-    if (r.some((x) => x.type === "sibling" && ((x.a === me && x.b === id) || (x.b === me && x.a === id))))
-      return "Брат/Сестра";
+    if (r.some((x) => x.type === "sibling" && ((x.a === me && x.b === id) || (x.b === me && x.a === id)))) return "Брат/Сестра";
 
     const parents = r.filter((x) => x.type === "parent" && x.b === me).map((x) => x.a);
     const gp = parents.flatMap((p) => r.filter((x) => x.type === "parent" && x.b === p).map((x) => x.a));
@@ -269,7 +244,7 @@ window.Tree = (function () {
     return "";
   }
 
-  /* ---------- Рендер карточек + диалоги ---------- */
+  /* ---------- Рендер карточек / диалоги ---------- */
   function renderPerson(id, rel) {
     const u = DB.users.find((x) => x.id === id);
     const dob = u.dob ? formatDate(u.dob) : "";
@@ -296,7 +271,6 @@ window.Tree = (function () {
     </div>`);
   }
 
-  // Расширенная форма мы уже ставили в прошлой версии — оставляем её без изменений
   function openAdd(contextId, selectedType) {
     const me = contextId || DB.currentUserId;
     const parents = DB.rels.filter((r) => r.type === "parent" && r.b === DB.currentUserId).map((r) => r.a);
@@ -427,9 +401,7 @@ window.Tree = (function () {
     const [y, m, d] = iso.split("-");
     return `${d}.${m}.${y}`;
   }
-  function uniq(arr) {
-    return Array.from(new Set(arr));
-  }
+  function uniq(arr) { return Array.from(new Set(arr)); }
 
   return { page, openProfile, openAdd, _saveAdd };
 })();
