@@ -51,31 +51,34 @@ if (!FamilyTree.templates.tommy) {
   }
 
   function renderFamilyTree() {
-    const container = document.getElementById('treeContainer');
-    const data = buildBalkanData(DB);          // { nodes, id2num, num2id, rootNum }
+const container = document.getElementById('treeContainer');
+const data = buildBalkanData(DB); // { nodes, rootNum, ... }
 
-    if (!data.nodes.length) {
-      container.innerHTML = `<div class="card" style="margin:12px">Нет данных для отображения</div>`;
-      return;
+if (!data.nodes.length) {
+  container.innerHTML = `<div class="card" style="margin:12px">Нет данных для отображения</div>`;
+  return;
+}
+
+if (!family) {
+  // отдаём узлы сразу в конструктор
+  family = new window.FamilyTree(container, {
+    template: 'tommy',
+    mouseScrool: window.FamilyTree.action.zoom,
+    enableSearch: true,
+    nodeBinding: { field_0: 'name', field_1: 'subtitle' },
+    roots: data.rootNum ? [data.rootNum] : undefined,
+    siblingSeparation: 80,
+    levelSeparation: 70,
+    subtreeSeparation: 100,
+    nodes: data.nodes,                       // ⬅️ здесь узлы идут сразу
+    nodeMouseClick: (args) => {
+      if (args && args.node) openProfile(data.num2id.get(args.node.id));
     }
+  });
+} else {
+  family.load(data.nodes);                   // последующие обновления
+}
 
-    // первый запуск — отдаём ноды прямо в конструктор
-    if (!family) {
-      family = new window.FamilyTree(container, {
-        template: 'tommy',
-        mouseScrool: window.FamilyTree.action.zoom,
-        enableSearch: true,
-        nodeBinding: { field_0: 'name', field_1: 'subtitle' },
-        roots: data.rootNum ? [data.rootNum] : undefined,
-        siblingSeparation: 80,
-        levelSeparation: 70,
-        subtreeSeparation: 100,
-        nodeMouseClick: (args) => { if (args && args.node) openProfile(data.num2id.get(args.node.id)); }
-      });
-    }
-
-    family.load(data.nodes);
-  }
 
   // === Адаптер: строки -> числа ===
   function buildBalkanData(DB) {
