@@ -38,7 +38,7 @@ a{color:inherit;text-decoration:none}
 #title{ font-weight:700; letter-spacing:.2px; font-size:18px; }
 #header-action{ min-width:24px; min-height:24px }
 
-/* ========= View (main content) ========= */
+/* ========= View ========= */
 .view{ flex:1 1 auto; padding:16px; padding-bottom:96px; }
 
 /* ========= Tabbar ========= */
@@ -58,7 +58,7 @@ a{color:inherit;text-decoration:none}
 .tab img{ width:22px; height:22px; display:block }
 .tab.active{ color:var(--brand); background:linear-gradient(0deg, rgba(255,122,0,.08), rgba(255,122,0,.08)); }
 
-/* ========= Cards / Lists / Items ========= */
+/* ========= Cards / Lists ========= */
 .card{
   background:var(--card);
   border:1px solid var(--border);
@@ -123,11 +123,10 @@ input, select, textarea, button{ font:inherit; color:inherit; }
 }
 .backdrop.visible{ opacity:1; pointer-events:auto; }
 
-/* ========= Feed specifics ========= */
+/* ========= Feed / Login ========= */
 .kv{ display:grid; grid-template-columns: 140px 1fr; gap:8px; }
 .kv > div:nth-child(odd){ color:var(--muted) }
 
-/* ========= Typeahead / Login list ========= */
 .typeahead{ position:relative }
 .suggest{
   position:absolute; left:0; right:0; top:100%; z-index:5;
@@ -142,35 +141,50 @@ input, select, textarea, button{ font:inherit; color:inherit; }
 .login-item{padding:10px 12px; border-bottom:1px solid #f2f2f2; cursor:pointer}
 .login-item:hover{background:#fff7f0}
 
-/* ========= Tree (cards) ========= */
-.tree{ position: relative; padding: 8px 0 80px; }
+/* ========= Tree (cards + адаптив) ========= */
+.tree{ position: relative; padding: 8px 0 80px; z-index:0; }
 .gen-row{
-  display:flex; flex-wrap:wrap; justify-content:center; gap:20px; margin:14px 0;
+  display:flex; justify-content:center; gap:20px; margin:14px 0;
+  flex-wrap:wrap;
 }
 .person{
   min-width:220px; max-width:260px;
   background:#fff; border:1px solid var(--border); border-radius:14px; padding:12px 14px;
   box-shadow:var(--shadow); cursor:pointer; text-align:center;
+  position:relative; z-index:1;   /* карточка поверх линий */
+  scroll-snap-align:center;
 }
 .person .name{ font-weight:700; }
 .person .sub{ color:var(--muted); font-size:12px; margin-top:4px }
 .person .rel{ margin-top:6px; font-size:12px; background:#fff6ee; color:#a24a00; display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid #ffd7b0 }
 
-/* ========= SVG линии для древа ========= */
+/* — мобильный режим: ряды скроллятся горизонтально, снэпятся, чтобы влезали на экран */
+@media (max-width: 640px){
+  .gen-row{
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    padding: 0 10px;
+    gap:16px;
+    scroll-snap-type:x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ========= SVG линии ========= */
 .links{
   position:absolute; inset:0;
   pointer-events:none; overflow:visible;
+  z-index:0; /* линии под карточками */
 }
 .link{
   fill:none;
-  stroke:#e58529;          /* основной цвет линий */
+  stroke:#e58529;
   stroke-width:3;
-  stroke-linecap:round;
-  stroke-linejoin:round;
+  stroke-linecap:round; stroke-linejoin:round;
   filter: drop-shadow(0 1px 0 rgba(0,0,0,.08));
 }
-.link.bundle{ stroke-width:3.5; opacity:.95 }   /* «пучок» от пары к ребёнку */
-.link.spouse{ stroke:#d07c2a; stroke-width:3 }  /* линия супругов */
+.link.bundle{ stroke-width:3.5; opacity:.95 }
+.link.spouse{ stroke:#d07c2a; stroke-width:3 }
 
 /* ========= Responsive ========= */
 @media (min-width:768px){
