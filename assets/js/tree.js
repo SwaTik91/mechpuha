@@ -31,13 +31,23 @@ window.Tree = (function () {
       script.async = false; script.src = './familytree.js';
       await new Promise((res, rej) => { script.onload=res; script.onerror=()=>rej(new Error('familytree.js not loaded')); document.head.appendChild(script); });
     }
-    // Простой шаблон (если свой не подключен)
-    if (!FamilyTree.templates.tommy) {
-      FamilyTree.templates.tommy = Object.assign({}, FamilyTree.templates.base);
-      FamilyTree.templates.tommy.field_0 = `<text ${FamilyTree.attr.width}="230" style="font-size: 16px;font-weight:600;" fill="#ffffff" x="12" y="84" text-anchor="start">{val}</text>`;
-      FamilyTree.templates.tommy.field_1 = `<text ${FamilyTree.attr.width}="150" style="font-size: 12px;" fill="#ffffff" x="12" y="64" text-anchor="start">{val}</text>`;
-      FamilyTree.templates.tommy.node = `<rect x="0" y="0" height="{h}" width="{w}" stroke-width="1" fill="#039BE5" stroke="#0288D1" rx="8" ry="8"></rect>`;
-    }
+// Простой шаблон (если свой не подключен)
+if (!FamilyTree.templates.tommy) {
+  const base = FamilyTree.templates.base;
+  FamilyTree.templates.tommy = Object.assign({}, base);
+
+  // ВАЖНО: задаём явный размер карточки
+  FamilyTree.templates.tommy.size = [240, 100];
+
+  FamilyTree.templates.tommy.field_0 =
+    `<text ${FamilyTree.attr.width}="220" style="font-size:16px;font-weight:600" fill="#ffffff" x="12" y="84" text-anchor="start">{val}</text>`;
+  FamilyTree.templates.tommy.field_1 =
+    `<text ${FamilyTree.attr.width}="200" style="font-size:12px;opacity:.9" fill="#ffffff" x="12" y="64" text-anchor="start">{val}</text>`;
+
+  FamilyTree.templates.tommy.node =
+    `<rect x="0" y="0" height="{h}" width="{w}" stroke-width="1" fill="#039BE5" stroke="#0288D1" rx="8" ry="8"></rect>`;
+}
+
   }
 
   function renderFamilyTree() {
