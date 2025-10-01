@@ -2,126 +2,122 @@
 window.Tree = (function(){
   function page(){
     UI.title('Семейное древо');
-    UI.action('<button class="btn ghost" onclick="Tree.addRelative()">Добавить</button>');
+    UI.action('<button class="btn ghost" onclick="Tree.openAdd()">Добавить родственника</button>');
     const v = UI.view();
-    const rootId = DB.currentUserId;
-    const layers = buildLayers(rootId); // { '-1': parents, '0': root+siblings, '1': children, '2': grandchildren ... }
-    const html = Object.keys(layers).sort((a,b)=>parseInt(a)-parseInt(b)).map(level=>{
-      const row = layers[level].map(id=>renderPerson(id)).join('');
-      return `<div class="generation">${row}</div>`;
+    const me = DB.currentUserId;
+    const layers = buildLayers(me);
+    const order = Object.keys(layers).sort((a,b)=>{
+      const na = a.replace('u','').replace('c',''); const nb = b.replace('u','').replace('c','');
+      return parseInt(na)-parseInt(nb);
+    });
+    const html = order.map((lvl,i)=>{
+      const row = layers[lvl].map(id=>renderPerson(id, relationToMe(me,id))).join('');
+      const arrows = (i < order.length-1) ? '<div class="arrow-down"></div>' : '';
+      return `<div class="generation">${row}${arrows}</div>`;
     }).join('');
     v.innerHTML = `<div class="tree-grid">${html}</div>`;
   }
 
-  function buildLayers(rootId){
-    const users = Object.fromEntries(DB.users.map(u=>[u.id,u]));
-    const rels = DB.rels;
-    const parents = rels.filter(r=>r.type==='parent' && r.b===rootId).map(r=>r.a);
-    const children = rels.filter(r=>r.type==='child' && r.a===rootId).map(r=>r.b);
-    const spouse = rels.filter(r=>r.type==='spouse' && (r.a===rootId||r.b===rootId))
-                      .map(r=> r.a===rootId ? r.b : r.a);
-    // siblings: share a parent
-    const siblings = Array.from(new Set(parents.flatMap(p => rels.filter(r=>r.type==='parent' && r.a===p).map(r=>r.b))))
-                     .filter(id => id!==rootId);
-
-    // grandchildren
-    const grandchildren = children.flatMap(c => rels.filter(r=>r.type==='child' && r.a===c).map(r=>r.b));
-
-    const layers = {};
-    if(parents.length) layers['-1'] = parents;
-    layers['0'] = [rootId, ...spouse, ...siblings];
-    if(children.length) layers['1'] = children;
-    if(grandchildren.length) layers['2'] = grandchildren;
-    return layers;
+  function buildLayers(root){
+    const r = DB.rels;
+    const parents = r.filter(x=>x.type==='parent'&&x.b===root).map(x=>x.a);
+    const spouse = r.filter(x=>x.type==='spouse'&&(x.a===root||x.b===root)).map(x=> x.a===root?x.b:x.a);
+    const siblings = Array.from(new Set(parents.flatMap(p=> r.filter(x=>x.type==='parent'&&x.a===p).map(x=>x.b)))).filter(id=>id!==root);
+    const children = r.filter(x=>x.type==='child'&&x.a===root).map(x=>x.b);
+    const grandchildren = children.flatMap(c=> r.filter(x=>x.type==='child'&&x.a===c).map(x=>x.b));
+    const grandparents = parents.flatMap(p=> r.filter(x=>x.type==='parent'&&x.b===p).map(x=>x.a));
+    const auntsUncles = parents.flatMap(p=>{
+      const gp = r.filter(x=>x.type==='parent'&&x.b===p).map(x=>x.a);
+      const kids = gp.flatMap(g=> r.filter(x=>x.type==='parent'&&x.a===g).map(x=>x.b));
+      return kids.filter(x=>x!==p);
+    });
+    const cousins = auntsUncles.flatMap(au=> r.filter(x=>x.type==='child'&&x.a===au).map(x=>x.b));
+    const L={};
+    if(grandparents.length) L['-2']=uniq(grandparents);
+    if(parents.length) L['-1']=uniq(parents);
+    if(auntsUncles.length) L['-1u']=uniq(auntsUncles);
+    L['0']=uniq([root,...spouse,...siblings]);
+    if(children.length) L['1']=uniq(children);
+    if(cousins.length) L['1c']=uniq(cousins);
+    if(grandchildren.length) L['2']=uniq(grandchildren);
+    return L;
   }
-
-  function renderPerson(id){
+  function relationToMe(me, id){
+    if(me===id) return "Я";
+    const r = DB.rels;
+    if(r.some(x=>x.type==='spouse'&&((x.a===me&&x.b===id)||(x.b===me&&x.a===id)))) return "Супруг/а";
+    if(r.some(x=>x.type==='parent'&&x.a===id&&x.b===me)) return "Отец/Мать";
+    if(r.some(x=>x.type==='child'&&x.a===me&&x.b===id)) return "Сын/Дочь";
+    if(r.some(x=>x.type==='sibling'&&((x.a===me&&x.b===id)||(x.b===me&&x.a===id)))) return "Брат/Сестра";
+    const parents = r.filter(x=>x.type==='parent'&&x.b===me).map(x=>x.a);
+    const gp = parents.flatMap(p=> r.filter(x=>x.type==='parent'&&x.b===p).map(x=>x.a));
+    if(gp.includes(id)) return "Дедушка/Бабушка";
+    const aunts = parents.flatMap(p=>{
+      const gp2 = r.filter(x=>x.type==='parent'&&x.b===p).map(x=>x.a);
+      const kids = gp2.flatMap(g=> r.filter(x=>x.type==='parent'&&x.a===g).map(x=>x.b));
+      return kids.filter(x=>x!==p);
+    });
+    if(aunts.includes(id)) return "Дядя/Тётя";
+    const cousins = aunts.flatMap(au=> r.filter(x=>x.type==='child'&&x.a===au).map(x=>x.b));
+    if(cousins.includes(id)) return "Двоюродный брат/сестра";
+    return "";
+  }
+  function renderPerson(id, rel){
     const u = DB.users.find(x=>x.id===id);
-    const sub = u.dob ? u.dob : '';
+    const dates = (u.dob||'') + (u.dod? (' • † '+u.dod): '');
     return `<div class="person" onclick="Tree.openProfile('${id}')">
-      <img class="avatar" src="${u.photo||''}" onerror="this.style.display='none'">
       <div class="name">${u.name}</div>
-      <div class="sub">${sub}</div>
-      ${renderBadges(id)}
+      <div class="sub">${dates}</div>
+      ${rel? `<div class="rel">${rel}</div>`:''}
     </div>`;
   }
-
-  function renderBadges(id){
-    const rels = DB.rels;
-    let out = '';
-    if(rels.some(r=>r.type==='spouse' && (r.a===id||r.b===id))) out += `<div class="badge">Супруг/а</div>`;
-    return out;
-  }
-
   function openProfile(id){
     const u = DB.users.find(x=>x.id===id);
-    const isDeceased = !!u.dod;
-    UI.sheet(`
-      <div class="vstack">
-        <div class="hstack"><img class="avatar" src="${u.photo||''}" onerror="this.style.display='none'"><div>
-          <div style="font-weight:700">${u.name}</div>
-          <div class="small">${u.dob||''}${isDeceased? ' • † '+u.dod : ''}</div>
-        </div></div>
-        <div class="kv">
-          <div>Город</div><div>${u.city||'—'}</div>
-          <div>Происхождение</div><div>${u.origin||'—'}</div>
-        </div>
-        <div class="section-title">Действия</div>
-        <div class="hstack">
-          <button class="btn" onclick="Tree.addRelative('${id}')">Добавить родственника</button>
-          <button class="btn ghost" onclick="UI.close()">Закрыть</button>
-        </div>
+    const dates = (u.dob||'') + (u.dod? (' • † '+u.dod): '');
+    UI.sheet(`<div class="vstack">
+      <div class="section-title">${u.name}</div>
+      <div class="small">${dates}</div>
+      <div class="section-title">Действия</div>
+      <div class="hstack">
+        <button class="btn" onclick="Tree.openAdd('${id}')">Добавить родственника</button>
+        <button class="btn ghost" onclick="UI.close()">Закрыть</button>
       </div>
-    `);
+    </div>`);
   }
-
-  function addRelative(contextId){
-    UI.sheet(`
-      <div class="vstack">
-        <div class="section-title">Добавить родственника</div>
-        <input id="rel_name" class="input" placeholder="ФИО">
-        <input id="rel_dob" class="input" placeholder="Дата рождения (YYYY-MM-DD)">
-        <select id="rel_type" class="select">
-          <option value="parent">Мать/Отец</option>
-          <option value="child">Сын/Дочь</option>
-          <option value="sibling">Брат/Сестра</option>
-          <option value="spouse">Супруг/Супруга</option>
-        </select>
-        <button class="btn" onclick="Tree._saveRelative('${contextId||''}')">Сохранить</button>
-      </div>
-    `);
+  function openAdd(contextId){
+    UI.sheet(`<div class="vstack">
+      <div class="section-title">Добавить родственника</div>
+      <input id="rel_name" class="input" placeholder="ФИО">
+      <input id="rel_dob" class="input" placeholder="Дата рождения (YYYY-MM-DD)">
+      <select id="rel_type" class="select">
+        <option value="parent">Мать/Отец</option>
+        <option value="child">Сын/Дочь</option>
+        <option value="sibling">Брат/Сестра</option>
+        <option value="spouse">Супруг/Супруга</option>
+        <option value="grandparent">Дедушка/Бабушка</option>
+        <option value="auntuncle">Дядя/Тётя</option>
+        <option value="cousin">Двоюродный брат/сестра</option>
+      </select>
+      <button class="btn" onclick="Tree._saveAdd('${contextId||''}')">Сохранить</button>
+    </div>`);
   }
-
-  function _saveRelative(contextId){
+  function _saveAdd(contextId){
     const name = document.getElementById('rel_name').value.trim();
     const dob = document.getElementById('rel_dob').value.trim();
     const type = document.getElementById('rel_type').value;
-    if(!name){ alert('Введите имя'); return; }
-    // find or create
+    if(!name){ alert('Введите ФИО'); return; }
     let user = DB.users.find(u=>u.name.toLowerCase()===name.toLowerCase() && (u.dob||'')===dob);
-    if(!user){
-      user = { id: 'u'+(DB.users.length+1), name, dob };
-      DB.users.push(user);
-    }
+    if(!user){ user = {id:'u'+(DB.users.length+1), name, dob}; DB.users.push(user); }
     const me = contextId || DB.currentUserId;
-    const rel = {type, a: type==='parent'? user.id : me, b: type==='parent'? me : (type==='spouse'? user.id : (type==='sibling'? user.id : user.id))};
-    // normalize for sibling/spouse bi-directional & child inverse
-    if(type==='sibling'){
-      DB.rels.push({type:'sibling', a:me, b:user.id});
-      DB.rels.push({type:'sibling', a:user.id, b:me});
-    } else if(type==='spouse'){
-      DB.rels.push({type:'spouse', a:me, b:user.id});
-      DB.rels.push({type:'spouse', a:user.id, b:me});
-    } else if(type==='parent'){
-      DB.rels.push({type:'parent', a:user.id, b:me});
-    } else if(type==='child'){
-      DB.rels.push({type:'child', a:me, b:user.id});
-    } else {
-      DB.rels.push(rel);
-    }
-    UI.close();
-    page();
+    if(type==='parent'){ DB.rels.push({type:'parent', a:user.id, b:me}); }
+    else if(type==='child'){ DB.rels.push({type:'child', a:me, b:user.id}); }
+    else if(type==='sibling'){ DB.rels.push({type:'sibling', a:me, b:user.id}); DB.rels.push({type:'sibling', a:user.id, b:me}); }
+    else if(type==='spouse'){ DB.rels.push({type:'spouse', a:me, b:user.id}); DB.rels.push({type:'spouse', a:user.id, b:me}); }
+    else if(type==='grandparent'){ const parents = DB.rels.filter(r=>r.type==='parent' && r.b===me).map(r=>r.a); if(parents[0]) DB.rels.push({type:'parent', a:user.id, b:parents[0]}); }
+    else if(type==='auntuncle'){ const parents = DB.rels.filter(r=>r.type==='parent' && r.b===me).map(r=>r.a); if(parents[0]){ DB.rels.push({type:'sibling', a:parents[0], b:user.id}); DB.rels.push({type:'sibling', a:user.id, b:parents[0]}); } }
+    else if(type==='cousin'){ const parents = DB.rels.filter(r=>r.type==='parent' && r.b===me).map(r=>r.a); const aunts = parents.flatMap(p => { const gp = DB.rels.filter(r=>r.type==='parent' && r.b===p).map(r=>r.a); const kids = gp.flatMap(g=> DB.rels.filter(r=>r.type==='parent' && r.a===g).map(r=>r.b)); return kids.filter(x=>x!==p); }); if(aunts[0]) DB.rels.push({type:'child', a:aunts[0], b:user.id}); }
+    UI.close(); page();
   }
-
-  return { page, openProfile, addRelative, _saveRelative };
+  function uniq(arr){ return Array.from(new Set(arr)); }
+  return { page, openProfile, openAdd, _saveAdd };
 })();

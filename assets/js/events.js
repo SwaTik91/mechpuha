@@ -7,72 +7,63 @@ window.Events = (function(){
         <option value="wedding">Свадьба</option>
         <option value="brit">Брит Мила</option>
         <option value="barmitzvah">Бар Мицва</option>
-        <option value="mourning">Траур</option>
       </select>
       <input id="etitle" class="input" placeholder="Заголовок">
       <input id="edate" class="input" placeholder="Дата (YYYY-MM-DD)">
       <input id="eplace" class="input" placeholder="Место (адрес)">
+      <div class="section-title">Приглашения</div>
+      <div class="typeahead">
+        <input id="search" class="input" placeholder="Поиск по имени/фамилии" oninput="Events.searchUsers(this.value)">
+        <div id="suggest" class="suggest"></div>
+      </div>
+      <div id="selected" class="list"></div>
       <button class="btn" onclick="Events.create()">Создать</button>
     </div>`);
+    window._invitees = new Set();
+  }
+  function searchUsers(q){
+    q = (q||'').trim().toLowerCase();
+    const box = document.getElementById('suggest');
+    if(!q){ box.innerHTML=''; return; }
+    const found = DB.users.filter(u => u.name.toLowerCase().includes(q)).slice(0,20);
+    box.innerHTML = found.map(u=>`<div class="opt" onclick="Events.toggleInvite('${u.id}','${u.name}')">${u.name}</div>`).join('');
+  }
+  function toggleInvite(id, name){
+    if(!_invitees) window._invitees = new Set();
+    if(_invitees.has(id)) _invitees.delete(id); else _invitees.add(id);
+    const sel = document.getElementById('selected');
+    const arr = Array.from(_invitees);
+    sel.innerHTML = arr.length? arr.map(uid=>{
+      const u = DB.users.find(x=>x.id===uid);
+      return `<div class="item"><input type="checkbox" checked onclick="Events.toggleInvite('${uid}','${u.name}')"> ${u.name}</div>`;
+    }).join('') : '<div class="muted">Пока никого не выбрали</div>';
   }
   function create(){
-    const type = q('#etype').value;
-    const title = q('#etitle').value.trim() || defaultTitle(type);
-    const date = q('#edate').value.trim();
-    const place = q('#eplace').value.trim();
+    const type = document.getElementById('etype').value;
+    const title = document.getElementById('etitle').value.trim() || defaultTitle(type);
+    const date = document.getElementById('edate').value.trim();
+    const place = document.getElementById('eplace').value.trim();
     const id = 'e'+(DB.events.length+1);
-    DB.events.push({id,type,title,date,place,owner:DB.currentUserId});
+    const invited = Array.from(_invitees||[]);
+    DB.events.push({id,type,title,date,place,owner:DB.currentUserId,invited});
     UI.close(); Feed.page();
   }
-  function defaultTitle(t){
-    return t==='wedding'?'Свадьба': t==='brit'?'Брит Мила': t==='barmitzvah'?'Бар Мицва': 'Траур';
-  }
-  function open(id, typeHint){
-    const e = DB.events.find(x=>x.id===id) || {type:typeHint,title:'Событие'};
+  function defaultTitle(t){ return t==='wedding'?'Свадьба': t==='brit'?'Брит Мила':'Бар Мицва'; }
+  function open(id){
+    const e = DB.events.find(x=>x.id===id);
+    if(!e) return;
     UI.sheet(`<div class="vstack">
       <div class="section-title">${icon(e.type)} ${e.title}</div>
       <div class="kv"><div>Дата</div><div>${e.date||'—'}</div><div>Место</div><div>${e.place||'—'}</div></div>
-      ${e.type==='mourning'? mourningCalc(e): ''}
-      <div class="section-title">Пригласить</div>
-      <div class="hstack">
-        <button class="btn" onclick="Events.inviteRelatives('${e.id}')">Родственников</button>
-        <button class="btn ghost" onclick="Events.inviteCustom('${e.id}')">По списку</button>
-      </div>
+      <div class="section-title">Приглашены</div>
+      <div class="list">${(e.invited||[]).map(uid=>{ const u=DB.users.find(x=>x.id===uid); return u? `<div class="item">${u.name}</div>`:''; }).join('')||'<div class="muted">никого</div>'}</div>
     </div>`);
   }
-  function icon(t){
-    return t==='wedding'?'💍': t==='brit'?'✂️': t==='barmitzvah'?'📜': t==='mourning'?'🕯️':'📌';
+  function icon(t){return t==='wedding'?'💍': t==='brit'?'✂️': t==='barmitzvah'?'📜':'📌'}
+  function createMourning(title, date){
+    const id='e'+(DB.events.length+1);
+    const invited = DB.users.map(u=>u.id);
+    DB.events.push({id,type:'mourning',title,date,owner:'admin',invited});
   }
-  function mourningCalc(e){
-    if(!e.date) return '';
-    const base = new Date(e.date);
-    function addDays(d){ const x=new Date(base); x.setDate(x.getDate()+d); return x.toISOString().slice(0,10); }
-    return `<div class="card"><b>Даты траура</b>
-      <div class="small">Похороны: ${e.date}</div>
-      <div class="small">Шива (7 дней): ${addDays(7)}</div>
-      <div class="small">Сорок дней: ${addDays(40)}</div>
-      <div class="small">Годовщина: ${addDays(365)}</div>
-    </div>`;
-  }
-  function inviteRelatives(eid){
-    UI.sheet(`<div class="vstack">
-      <div class="section-title">Приглашения родственникам</div>
-      ${DB.users.map(u=>`<label class="item"><input type="checkbox" data-id="${u.id}"> ${u.name}</label>`).join('')}
-      <button class="btn" onclick="Events._send('${eid}')">Отправить</button>
-    </div>`);
-  }
-  function inviteCustom(eid){
-    UI.sheet(`<div class="vstack">
-      <div class="section-title">Вставьте список телефонов/почт</div>
-      <textarea id="custom" class="textarea" rows="5" placeholder="+7..., имя..."></textarea>
-      <button class="btn" onclick="(function(){ alert('Приглашения отправлены'); UI.close(); })()">Отправить</button>
-    </div>`);
-  }
-  function _send(eid){
-    const checks = Array.from(document.querySelectorAll('input[type=checkbox][data-id]:checked')).map(x=>x.getAttribute('data-id'));
-    alert('Отправлено приглашений: '+checks.length);
-    UI.close();
-  }
-  function q(sel){return document.querySelector(sel)}
-  return { openCreate, create, open, inviteRelatives, inviteCustom, _send };
+  return { openCreate, create, open, searchUsers, toggleInvite, createMourning };
 })();
