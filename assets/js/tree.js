@@ -96,90 +96,77 @@ function renderFamilyTree() {
     family.load(data.nodes);
   }
 
-  // показать всё и центрировать на тебе
-  setTimeout(() => {
-    family.fit();
-    if (data.rootNum) {
-      family.center(data.rootNum);
-      family.select(data.rootNum);
-    }
-  }, 0);
+// показать всё и сфокусироваться на тебе
+setTimeout(() => {
+  try { family.fit(); } catch(e) {}
+  if (data.rootNum) {
+    try { family.center(data.rootNum); family.select(data.rootNum); } catch(e) {}
+  }
+}, 0);
 }
 
 
-/* ===== Адаптер: строки -> числа + починка связей (устойчиво) ===== */
+/* ----- Адаптер: строки -> числа, связи -> fid/mid/pids (минимально и устойчиво) ----- */
 function buildBalkanData(DB) {
   // 1) строки id -> числа
   const id2num = new Map(), num2id = new Map(); let seq = 1;
-  for (const u of DB.users) if (!id2num.has(u.id)) { id2num.set(u.id, seq); num2id.set(seq, u.id); seq++; }
+  for (const u of DB.users) { if (!id2num.has(u.id)) { id2num.set(u.id, seq); num2id.set(seq, u.id); seq++; } }
   for (const r of DB.rels) {
     if (!id2num.has(r.a)) { id2num.set(r.a, seq); num2id.set(seq, r.a); seq++; }
     if (!id2num.has(r.b)) { id2num.set(r.b, seq); num2id.set(seq, r.b); seq++; }
   }
 
   // 2) индексы
-  const parentsByChild = new Map(); // num(child) -> Set(num(parent))
-  const partners = new Map();       // num -> Set(numPartner)
-  const siblings = [];              // [ [numA,numB], ... ]
-  const setAdd = (map, key, val) => { if (!map.has(key)) map.set(key, new Set()); map.get(key).add(val); };
+  const parentsByChild = new Map();   // num(child) -> Set(num(parent))
+  const partners = new Map();         // num -> Set(numPartner)
+  const siblings = [];                // [ [a,b], ... ]
+  const setAdd = (m, k, v) => { if (!m.has(k)) m.set(k, new Set()); m.get(k).add(v); };
 
   for (const r of DB.rels) {
     const a = id2num.get(r.a), b = id2num.get(r.b);
-    if (r.type === 'parent') {
-      setAdd(parentsByChild, b, a);
-    } else if (r.type === 'child') {
-      // трактуем child как parent->child
-      setAdd(parentsByChild, b, a);
-    } else if (r.type === 'spouse') {
+    if (r.type === 'parent') setAdd(parentsByChild, b, a);
+    else if (r.type === 'child') setAdd(parentsByChild, b, a);         // трактуем как parent->child
+    else if (r.type === 'spouse') {
       if (!partners.has(a)) partners.set(a, new Set());
       if (!partners.has(b)) partners.set(b, new Set());
       partners.get(a).add(b); partners.get(b).add(a);
-    } else if (r.type === 'sibling') {
-      siblings.push([a, b]);
-    }
+    } else if (r.type === 'sibling') siblings.push([a, b]);
   }
 
-  // 3) наследуем родителей через sibling — только если у второго нет родителей вовсе
+  // 3) если у брата/сестры нет родителей — наследуем от другого
   for (const [a, b] of siblings) {
     const pa = parentsByChild.get(a), pb = parentsByChild.get(b);
     if (pa && (!pb || pb.size === 0)) parentsByChild.set(b, new Set(pa));
     if (pb && (!pa || pa.size === 0)) parentsByChild.set(a, new Set(pb));
   }
 
-  // 4) если у ребёнка один родитель, а у этого родителя один(а) супруг(а) —
-  //     считаем его/её вторым родителем (частый случай, когда связь заведена только от одного)
-  for (const [child, pset] of parentsByChild.entries()) {
-    if (pset.size === 1) {
-      const [onlyParent] = Array.from(pset);
-      const ps = partners.get(onlyParent);
-      if (ps && ps.size === 1) {
-        const [coParent] = Array.from(ps);
-        if (coParent !== onlyParent) pset.add(coParent);
-      }
+  // 4) если у ребёнка один родитель и у него ровно один супруг — добавим ко-родителя
+  for (const [child, set] of parentsByChild.entries()) {
+    if (set.size === 1) {
+      const [p] = Array.from(set);
+      const ps = partners.get(p);
+      if (ps && ps.size === 1) { const [co] = Array.from(ps); if (co !== p) set.add(co); }
     }
   }
 
-  // 5) максимум два родителя; если больше — берём супружескую пару, иначе первые два
-  const pickTwoParents = (childNum) => {
-    const set = parentsByChild.get(childNum);
-    if (!set || set.size <= 2) return set ? Array.from(set) : [];
-    const arr = Array.from(set);
-    for (let i = 0; i < arr.length; i++) {
-      for (let j = i + 1; j < arr.length; j++) {
-        const p1 = arr[i], p2 = arr[j];
-        if (partners.has(p1) && partners.get(p1).has(p2)) return [p1, p2];
-      }
-    }
+  // 5) максимум два родителя; если >2 — предпочесть супружескую пару, иначе первые два по возрастанию
+  const chooseParents = (child) => {
+    const s = parentsByChild.get(child);
+    if (!s) return [];
+    if (s.size <= 2) return Array.from(s);
+    const arr = Array.from(s);
+    for (let i = 0; i < arr.length; i++)
+      for (let j = i + 1; j < arr.length; j++)
+        if (partners.has(arr[i]) && partners.get(arr[i]).has(arr[j])) return [arr[i], arr[j]];
     return arr.sort((x, y) => x - y).slice(0, 2);
   };
 
-  // 6) строим ноды (важно: fid/mid!)
+  // 6) собрать ноды (ВАЖНО: fid/mid)
   const nodes = DB.users.map(u => {
-    const num = id2num.get(u.id);
-    const ps = pickTwoParents(num).sort((a, b) => a - b);
-    const fid = ps[0];  // father
-    const mid = ps[1];  // mother
-    const pids = partners.has(num) ? Array.from(partners.get(num)).sort((a,b)=>a-b) : undefined;
+    const id = id2num.get(u.id);
+    const ps = chooseParents(id).sort((a, b) => a - b);
+    const fid = ps[0], mid = ps[1];
+    const pids = partners.has(id) ? Array.from(partners.get(id)).sort((a, b) => a - b) : undefined;
 
     const subtitle = [
       u.dob ? fmt(u.dob) : '',
@@ -187,19 +174,17 @@ function buildBalkanData(DB) {
       u.city ? ` • ${u.city}` : ''
     ].join(' ').trim();
 
-    const n = { id: num, name: u.name, subtitle };
+    const n = { id, name: u.name, subtitle };
     if (fid) n.fid = fid;
     if (mid) n.mid = mid;
     if (pids && pids.length) n.pids = pids;
     return n;
   });
 
-  // 7) roots = все без родителей (иначе либе иногда показывают только «первого» корня)
-  const roots = nodes.filter(n => !n.fid && !n.mid).map(n => n.id);
-
   const rootNum = id2num.get(DB.currentUserId);
-  return { nodes, num2id, rootNum, roots };
+  return { nodes, num2id, rootNum };
 }
+
 
 
   function fmt(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); return `${d}.${m}.${y}`; }
