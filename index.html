@@ -1,0 +1,62 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>MishpuchaTech</title>
+  <!-- iOS/PWA metas -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MishpuchaTech">
+  <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#f6efe9" />
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <div id="app">
+    <header class="ios-header">
+      <div id="title">MishpuchaTech</div>
+      <div id="header-action"></div>
+    </header>
+
+    <main id="view" class="view"></main>
+
+    <nav class="tabbar">
+      <button data-tab="feed" class="tab active"><img src="assets/icons/feed.svg"><span>Лента</span></button>
+      <button data-tab="tree" class="tab"><img src="assets/icons/tree.svg"><span>Древо</span></button>
+      <button data-tab="calendar" class="tab"><img src="assets/icons/calendar.svg"><span>Календарь</span></button>
+      <button data-tab="groups" class="tab"><img src="assets/icons/chat.svg"><span>Группы</span></button>
+      <button data-tab="profile" class="tab"><img src="assets/icons/profile.svg"><span>Профиль</span></button>
+    </nav>
+  </div>
+
+  <!-- Modals / Sheets -->
+  <div id="sheet" class="sheet hidden">
+    <div class="sheet-handle"></div>
+    <div id="sheet-content"></div>
+  </div>
+  <div id="backdrop" class="backdrop hidden"></div>
+
+  <!-- Scripts -->
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/ui.js"></script>
+  <script src="assets/js/feed.js"></script>
+  <script src="assets/js/tree.js"></script>
+  <script src="assets/js/calendar.js"></script>
+  <script src="assets/js/groups.js"></script>
+  <script src="assets/js/events.js"></script>
+  <script src="assets/js/synagogues.js"></script>
+  <script src="assets/js/admin.js"></script>
+  <script src="assets/js/profile.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js');
+      });
+    }
+  </script>
+</body>
+</html>
