@@ -72,42 +72,42 @@ window.Tree = (function () {
     }
   }
 
-  function renderFamilyTree() {
-    const container = document.getElementById('treeContainer');
-    const data = buildBalkanData(DB); // { nodes, num2id, rootNum }
+function renderFamilyTree() {
+  const container = document.getElementById('treeContainer');
+  const data = buildBalkanData(DB); // { nodes, num2id, rootNum, roots }
 
-    if (!data.nodes.length) {
-      container.innerHTML = `<div class="card" style="margin:12px">Нет данных для отображения</div>`;
-      return;
+  if (!data.nodes.length) {
+    container.innerHTML = `<div class="card" style="margin:12px">Нет данных для отображения</div>`;
+    return;
+  }
+
+  if (!family) {
+    family = new window.FamilyTree(container, {
+      template: 'shalom',
+      nodeBinding: { field_0: 'name', field_1: 'subtitle' },
+      mouseScrool: window.FamilyTree.action.zoom,
+      minZoom: .5, maxZoom: 2, scaleInitial: window.innerWidth < 768 ? 0.8 : 1,
+      siblingSeparation: 90, levelSeparation: 80, subtreeSeparation: 110,
+      nodes: data.nodes,
+      roots: data.roots && data.roots.length ? data.roots : undefined, // ⬅️ добавили
+      nodeMouseClick: (args) => { if (args && args.node) openProfile(data.num2id.get(args.node.id)); }
+    });
+  } else {
+    family.load(data.nodes);
+  }
+
+  // показать всё и центрировать на тебе
+  setTimeout(() => {
+    family.fit();
+    if (data.rootNum) {
+      family.center(data.rootNum);
+      family.select(data.rootNum);
     }
-
-if (!family) {
-  family = new window.FamilyTree(container, {
-    template: 'shalom',
-    nodeBinding: { field_0: 'name', field_1: 'subtitle' },
-    mouseScrool: window.FamilyTree.action.zoom,
-    minZoom: .5, maxZoom: 2, scaleInitial: window.innerWidth < 768 ? 0.8 : 1,
-    siblingSeparation: 90, levelSeparation: 80, subtreeSeparation: 110,
-    nodes: data.nodes,
-    nodeMouseClick: (args) => { if (args && args.node) openProfile(data.num2id.get(args.node.id)); }
-  });
-} else {
-  family.load(data.nodes);
+  }, 0);
 }
 
-// общий для обоих случаев
-setTimeout(() => {
-  family.fit(); // показать всё дерево
-  if (data.rootNum) {
-    family.center(data.rootNum);
-    family.select(data.rootNum);
-  }
-}, 0);
 
-    
-  }
-
-/* ===== Адаптер: строки -> числа + починка связей (стабильнее) ===== */
+/* ===== Адаптер: строки -> числа + починка связей (устойчиво) ===== */
 function buildBalkanData(DB) {
   // 1) строки id -> числа
   const id2num = new Map(), num2id = new Map(); let seq = 1;
@@ -128,7 +128,7 @@ function buildBalkanData(DB) {
     if (r.type === 'parent') {
       setAdd(parentsByChild, b, a);
     } else if (r.type === 'child') {
-      // child трактуем как parent->child
+      // трактуем child как parent->child
       setAdd(parentsByChild, b, a);
     } else if (r.type === 'spouse') {
       if (!partners.has(a)) partners.set(a, new Set());
@@ -139,30 +139,41 @@ function buildBalkanData(DB) {
     }
   }
 
-  // 3) наследуем родителей через sibling — только если у второго нет родителей
+  // 3) наследуем родителей через sibling — только если у второго нет родителей вовсе
   for (const [a, b] of siblings) {
     const pa = parentsByChild.get(a), pb = parentsByChild.get(b);
     if (pa && (!pb || pb.size === 0)) parentsByChild.set(b, new Set(pa));
     if (pb && (!pa || pa.size === 0)) parentsByChild.set(a, new Set(pb));
   }
 
-  // 4) максимум два родителя; сначала пытаемся взять супружескую пару
+  // 4) если у ребёнка один родитель, а у этого родителя один(а) супруг(а) —
+  //     считаем его/её вторым родителем (частый случай, когда связь заведена только от одного)
+  for (const [child, pset] of parentsByChild.entries()) {
+    if (pset.size === 1) {
+      const [onlyParent] = Array.from(pset);
+      const ps = partners.get(onlyParent);
+      if (ps && ps.size === 1) {
+        const [coParent] = Array.from(ps);
+        if (coParent !== onlyParent) pset.add(coParent);
+      }
+    }
+  }
+
+  // 5) максимум два родителя; если больше — берём супружескую пару, иначе первые два
   const pickTwoParents = (childNum) => {
     const set = parentsByChild.get(childNum);
     if (!set || set.size <= 2) return set ? Array.from(set) : [];
     const arr = Array.from(set);
-    // пара супругов?
     for (let i = 0; i < arr.length; i++) {
       for (let j = i + 1; j < arr.length; j++) {
         const p1 = arr[i], p2 = arr[j];
         if (partners.has(p1) && partners.get(p1).has(p2)) return [p1, p2];
       }
     }
-    // иначе — первые два по возрастанию id (стабильно)
     return arr.sort((x, y) => x - y).slice(0, 2);
   };
 
-  // 5) ноды Balkan (fid/mid!)
+  // 6) строим ноды (важно: fid/mid!)
   const nodes = DB.users.map(u => {
     const num = id2num.get(u.id);
     const ps = pickTwoParents(num).sort((a, b) => a - b);
@@ -183,9 +194,13 @@ function buildBalkanData(DB) {
     return n;
   });
 
+  // 7) roots = все без родителей (иначе либе иногда показывают только «первого» корня)
+  const roots = nodes.filter(n => !n.fid && !n.mid).map(n => n.id);
+
   const rootNum = id2num.get(DB.currentUserId);
-  return { nodes, num2id, rootNum };
+  return { nodes, num2id, rootNum, roots };
 }
+
 
   function fmt(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); return `${d}.${m}.${y}`; }
 
