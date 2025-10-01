@@ -1,0 +1,85 @@
+/* Balkan FamilyTreeJS system styles */
+.bft {
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.bft-toolbar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(255,255,255,0.95);
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  z-index: 1000;
+}
+.bft-toolbar button {
+  border: none;
+  background: #f5f5f5;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.bft-toolbar button:hover {
+  background: #e2e2e2;
+}
+
+/* Popup edit form */
+.bft-edit-form {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  padding: 16px;
+  max-width: 320px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+.bft-edit-form-header {
+  font-weight: bold;
+  padding: 8px;
+  border-radius: 8px 8px 0 0;
+  margin: -16px -16px 12px -16px;
+  color: #fff;
+}
+.bft-edit-form input,
+.bft-edit-form select {
+  width: 100%;
+  margin: 6px 0;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+.bft-edit-form button {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #039BE5;
+  color: #fff;
+}
+.bft-edit-form button:hover {
+  background: #0288D1;
+}
+
+/* Context menu */
+.bft-context-menu {
+  position: absolute;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  padding: 4px 0;
+  z-index: 2000;
+}
+.bft-context-menu div {
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.bft-context-menu div:hover {
+  background: #f0f0f0;
+}
