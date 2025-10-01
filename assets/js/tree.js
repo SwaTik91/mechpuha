@@ -81,83 +81,120 @@ window.Tree = (function () {
       return;
     }
 
-    if (!family) {
-      family = new window.FamilyTree(container, {
-        template: 'shalom',
-        nodeBinding: { field_0: 'name', field_1: 'subtitle' },
-        mouseScrool: window.FamilyTree.action.zoom,
-        minZoom: .5, maxZoom: 2, scaleInitial: window.innerWidth < 768 ? 0.8 : 1,
-        siblingSeparation: 90, levelSeparation: 80, subtreeSeparation: 110,
-        roots: data.rootNum ? [data.rootNum] : undefined,
-        nodes: data.nodes,
-        nodeMouseClick: (args) => { if (args && args.node) openProfile(data.num2id.get(args.node.id)); }
-      });
-    } else {
-      family.load(data.nodes);
+if (!family) {
+  family = new window.FamilyTree(container, {
+    template: 'shalom',
+    nodeBinding: { field_0: 'name', field_1: 'subtitle' },
+    mouseScrool: window.FamilyTree.action.zoom,
+    minZoom: .5, maxZoom: 2, scaleInitial: window.innerWidth < 768 ? 0.8 : 1,
+    siblingSeparation: 90, levelSeparation: 80, subtreeSeparation: 110,
+    nodes: data.nodes,
+    nodeMouseClick: (args) => { if (args && args.node) openProfile(data.num2id.get(args.node.id)); }
+  });
+} else {
+  family.load(data.nodes);
+}
+
+// общий для обоих случаев
+setTimeout(() => {
+  family.fit(); // показать всё дерево
+  if (data.rootNum) {
+    family.center(data.rootNum);
+    family.select(data.rootNum);
+  }
+}, 0);
+
+    
+  }
+
+/* ===== Адаптер: строки -> числа + починка связей (стабильнее) ===== */
+function buildBalkanData(DB) {
+  // 1) маппинг строковых id -> чисел
+  const id2num = new Map(), num2id = new Map(); let seq = 1;
+  for (const u of DB.users) if (!id2num.has(u.id)) { id2num.set(u.id, seq); num2id.set(seq, u.id); seq++; }
+  for (const r of DB.rels) {
+    if (!id2num.has(r.a)) { id2num.set(r.a, seq); num2id.set(seq, r.a); seq++; }
+    if (!id2num.has(r.b)) { id2num.set(r.b, seq); num2id.set(seq, r.b); seq++; }
+  }
+
+  // 2) индексы: родители/супруги/сиблинги
+  const parentsByChild = new Map(); // num(child) -> Set(num(parent))
+  const partners = new Map();       // num -> Set(numPartner)
+  const siblings = [];              // [ [numA,numB], ... ]
+
+  const setAdd = (map, key, val) => { if (!map.has(key)) map.set(key, new Set()); map.get(key).add(val); };
+
+  for (const r of DB.rels) {
+    const a = id2num.get(r.a), b = id2num.get(r.b);
+    if (r.type === 'parent') {
+      setAdd(parentsByChild, b, a);
+    } else if (r.type === 'child') {
+      // у нас child означает parent->child
+      setAdd(parentsByChild, b, a);
+    } else if (r.type === 'spouse') {
+      if (!partners.has(a)) partners.set(a, new Set());
+      if (!partners.has(b)) partners.set(b, new Set());
+      partners.get(a).add(b); partners.get(b).add(a);
+    } else if (r.type === 'sibling') {
+      siblings.push([a, b]);
     }
   }
 
-  /* ===== Адаптер: строки -> числа + починка связей ===== */
-  function buildBalkanData(DB) {
-    // 1) маппинг строковых id -> чисел
-    const id2num = new Map(), num2id = new Map(); let seq = 1;
-    for (const u of DB.users) if (!id2num.has(u.id)) { id2num.set(u.id, seq); num2id.set(seq, u.id); seq++; }
-    for (const r of DB.rels) {
-      if (!id2num.has(r.a)) { id2num.set(r.a, seq); num2id.set(seq, r.a); seq++; }
-      if (!id2num.has(r.b)) { id2num.set(r.b, seq); num2id.set(seq, r.b); seq++; }
-    }
+  // 3) наследуем родителей через sibling — ТОЛЬКО если у второго вовсе нет родителей
+  for (const [a, b] of siblings) {
+    const pa = parentsByChild.get(a), pb = parentsByChild.get(b);
+    if (pa && (!pb || pb.size === 0)) parentsByChild.set(b, new Set(pa));
+    if (pb && (!pa || pa.size === 0)) parentsByChild.set(a, new Set(pb));
+  }
 
-    // 2) индексы: родители/супруги/сиблинги
-    const parentsByChild = new Map(); // num(child) -> Set(num(parent))
-    const partners = new Map();       // num -> Set(numPartner)
-    const siblings = [];              // [ [numA,numB], ... ]
+  // 4) нормализуем родителей: максимум 2; если можно — берём именно пару-супругов
+  const pickTwoParents = (childNum) => {
+    const set = parentsByChild.get(childNum);
+    if (!set || set.size <= 2) return set ? Array.from(set) : [];
 
-    for (const r of DB.rels) {
-      const a = id2num.get(r.a), b = id2num.get(r.b);
-      if (r.type === 'parent') {
-        setAdd(parentsByChild, b, a);
-      } else if (r.type === 'child') {
-        // учитываем child как parent->child
-        setAdd(parentsByChild, b, a);
-      } else if (r.type === 'spouse') {
-        if (!partners.has(a)) partners.set(a, new Set());
-        if (!partners.has(b)) partners.set(b, new Set());
-        partners.get(a).add(b); partners.get(b).add(a);
-      } else if (r.type === 'sibling') {
-        siblings.push([a, b]);
+    const arr = Array.from(set);
+    // попробовать найти пару-супругов среди родителей
+    let best = null;
+    for (let i = 0; i < arr.length; i++) {
+      for (let j = i + 1; j < arr.length; j++) {
+        const p1 = arr[i], p2 = arr[j];
+        const areSpouses = partners.has(p1) && partners.get(p1).has(p2);
+        if (areSpouses) { best = [p1, p2]; break; }
       }
+      if (best) break;
     }
+    // если супружеская пара не найдена — берём первые два по возрастанию id (стабильно)
+    if (!best) best = arr.sort((x, y) => x - y).slice(0, 2);
+    return best;
+  };
 
-    // 3) наследуем родителей через sibling (если у одного есть, у второго нет)
-    for (const [a, b] of siblings) {
-      const pa = parentsByChild.get(a), pb = parentsByChild.get(b);
-      if (pa && !pb) parentsByChild.set(b, new Set(pa));
-      if (pb && !pa) parentsByChild.set(a, new Set(pb));
-    }
+  // 5) собираем ноды
+  const nodes = DB.users.map(u => {
+    const num = id2num.get(u.id);
+    const ps = pickTwoParents(num);
+    // стабильно упорядочим, чтобы раскладка не «гуляла»
+    ps.sort((a, b) => a - b);
+    const fid = ps[0];        // father (Balkan ждёт ключ fid)
+    const mid = ps[1];        // mother (ключ mid)
+    const pids = partners.has(num) ? Array.from(partners.get(num)).sort((a,b)=>a-b) : undefined;
 
-    // 4) собираем ноды
-    const nodes = DB.users.map(u => {
-      const num = id2num.get(u.id);
-      const ps = Array.from(parentsByChild.get(num) || []);
-      const fid = ps[0];  // father
-      const mid = ps[1];  // mother
-      const pids = partners.has(num) ? Array.from(partners.get(num)) : undefined;
+    const subtitle = [
+      u.dob ? fmt(u.dob) : '',
+      u.dod ? `– ${fmt(u.dod)}` : '',
+      u.city ? ` • ${u.city}` : ''
+    ].join(' ').trim();
 
-      const subtitle = [
-        u.dob ? fmt(u.dob) : '',
-        u.dod ? `– ${fmt(u.dod)}` : '',
-        u.city ? ` • ${u.city}` : ''
-      ].join(' ').trim();
+    const n = { id: num, name: u.name, subtitle };
+    if (fid) n.fid = fid;
+    if (mid) n.mid = mid;
+    if (pids && pids.length) n.pids = pids;
+    return n;
+  });
 
-      const n = { id: num, name: u.name, subtitle };
-      if (fid) n.fid = fid;
-      if (mid) n.mid = mid;
-      if (pids && pids.length) n.pids = pids;
-      return n;
-    });
+  const rootNum = id2num.get(DB.currentUserId);
+  return { nodes, num2id, rootNum };
+}
 
-    const rootNum = id2num.get(DB.currentUserId);
-    return { nodes, num2id, rootNum };
 
     function setAdd(map, key, val){
       if (!map.has(key)) map.set(key, new Set());
