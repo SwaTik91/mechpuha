@@ -141,6 +141,23 @@ button{ font:inherit; }
 .tree{
   display:flex; flex-direction:column; gap:14px;
 }
+/* Tree links layer */
+.tree{ position: relative; } /* чтобы SVG позиционировался поверх */
+.links{
+  position:absolute; inset:0;
+  pointer-events:none;
+}
+.link{
+  fill:none;
+  stroke:#e58529;         /* основной цвет линий */
+  stroke-width:3;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  filter: drop-shadow(0 1px 0 rgba(0,0,0,.08));
+}
+.link.bundle{ stroke-width:3.5; opacity:.95 }  /* «пучок» от пары */
+.link.spouse{ stroke:#d07c2a; stroke-width:3 } /* линия супругов */
+
 .gen-row{
   display:flex; flex-wrap:wrap; justify-content:center; gap:12px; position:relative;
 }
