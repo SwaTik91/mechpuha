@@ -89,8 +89,10 @@ function renderFamilyTree() {
       minZoom: .5, maxZoom: 2, scaleInitial: window.innerWidth < 768 ? 0.8 : 1,
       siblingSeparation: 90, levelSeparation: 80, subtreeSeparation: 110,
       nodes: data.nodes,
-      roots: data.roots && data.roots.length ? data.roots : undefined, // ⬅️ добавили
-      nodeMouseClick: (args) => { if (args && args.node) openProfile(data.num2id.get(args.node.id)); }
+      // roots убираем полностью, иначе дерево обрезается и показываются только ближайшие
+      nodeMouseClick: (args) => { 
+        if (args && args.node) openProfile(data.num2id.get(args.node.id)); 
+      }
     });
   } else {
     family.load(data.nodes);
