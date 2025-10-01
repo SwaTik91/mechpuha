@@ -8,13 +8,13 @@ window.UI = (function(){
     document.getElementById('backdrop').classList.remove('hidden'); };
   const close = ()=>{ document.getElementById('sheet').classList.add('hidden');
     document.getElementById('backdrop').classList.add('hidden'); };
-  window.addEventListener('load', ()=>{
-    const tabs = document.querySelectorAll('.tabbar .tab');
-    tabs.forEach(btn=>btn.addEventListener('click', ()=>{
-      tabs.forEach(b=>b.classList.remove('active')); btn.classList.add('active'); route(btn.getAttribute('data-tab'));
-    }));
-    route('feed');
-  });
+  // window.addEventListener('load', ()=>{
+    // const tabs = document.querySelectorAll('.tabbar .tab');
+    // tabs.forEach(btn=>btn.addEventListener('click', ()=>{
+      // tabs.forEach(b=>b.classList.remove('active')); btn.classList.add('active'); route(btn.getAttribute('data-tab'));
+    // }));
+    // route('feed');
+  // });
   window.route = function(tab){
     switch(tab){ case 'feed': Feed.page(); break; case 'tree': Tree.page(); break; case 'calendar': Calendar.page(); break; case 'groups': Groups.page(); break; case 'profile': Profile.page(); break; default: Feed.page(); }
   }
