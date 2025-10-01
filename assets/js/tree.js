@@ -1,4 +1,4 @@
-/* Balkan FamilyTreeJS integration (fid/mid + iPhone touch fix) */
+/* FamilyTreeJS integration: full logic + nicer template */
 window.Tree = (function () {
   let family = null;
   let isBalkanReady = false;
@@ -11,7 +11,6 @@ window.Tree = (function () {
     UI.action('<button class="btn ghost" onclick="Tree.openAdd()">Добавить родственника</button>');
 
     const v = UI.view();
-    // контейнер с безопасными для iOS стилями (чтобы клики не блокировались)
     v.innerHTML = `
       <div id="treeContainer"
            style="width:100%;height:72vh;background:#fff;border-radius:12px;border:1px solid #e5e7eb;
@@ -38,22 +37,38 @@ window.Tree = (function () {
     if (!window.FamilyTree) {
       const script = document.createElement('script');
       script.async = false;
-      script.src = './familytree.js'; // положи рядом с index.html
-      await new Promise((res, rej) => { script.onload = res; script.onerror = () => rej(new Error('familytree.js not loaded')); document.head.appendChild(script); });
+      script.src = './familytree.js';
+      await new Promise((res, rej) => {
+        script.onload = res;
+        script.onerror = () => rej(new Error('familytree.js not loaded'));
+        document.head.appendChild(script);
+      });
     }
 
-    // Шаблон на случай, если свой не подключен
-    if (!FamilyTree.templates.tommy) {
+    // Красивый шаблон "shalom"
+    if (!FamilyTree.templates.shalom) {
       const base = FamilyTree.templates.base;
-      FamilyTree.templates.tommy = Object.assign({}, base);
-      // обязательно задаём размер, иначе ноды «невидимые»
-      FamilyTree.templates.tommy.size = [240, 100];
-      FamilyTree.templates.tommy.field_0 =
-        `<text ${FamilyTree.attr.width}="220" style="font-size:16px;font-weight:600" fill="#ffffff" x="12" y="84" text-anchor="start">{val}</text>`;
-      FamilyTree.templates.tommy.field_1 =
-        `<text ${FamilyTree.attr.width}="200" style="font-size:12px;opacity:.9" fill="#ffffff" x="12" y="64" text-anchor="start">{val}</text>`;
-      FamilyTree.templates.tommy.node =
-        `<rect x="0" y="0" height="{h}" width="{w}" stroke-width="1" fill="#6b7280" stroke="#6b7280" rx="8" ry="8"></rect>`;
+      FamilyTree.templates.shalom = Object.assign({}, base);
+      FamilyTree.templates.shalom.size = [280, 120];
+      FamilyTree.templates.shalom.defs = `
+        <filter id="ftShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity=".12"/>
+        </filter>
+      `;
+      FamilyTree.templates.shalom.node =
+        `<rect x="0" y="0" rx="14" ry="14" width="{w}" height="{h}"
+               fill="#ffffff" stroke="#e6e6e6" filter="url(#ftShadow)"></rect>`;
+      FamilyTree.templates.shalom.field_0 =
+        `<text ${FamilyTree.attr.width}="250" x="16" y="76"
+               style="font-size:17px;font-weight:700;fill:#1f2937" text-anchor="start">{val}</text>`;
+      FamilyTree.templates.shalom.field_1 =
+        `<text ${FamilyTree.attr.width}="250" x="16" y="54"
+               style="font-size:12px;fill:#6b7280" text-anchor="start">{val}</text>`;
+      FamilyTree.templates.shalom.link =
+        `<path stroke="#e9a25b" stroke-width="2.5" fill="none"></path>`;
+      FamilyTree.templates.shalom.partnerConnector = { stroke: "#d68d4a", "stroke-width": 2.5 };
+      FamilyTree.templates.shalom.plus =
+        `<circle cx="15" cy="15" r="15" fill="#ff7a00"></circle><text x="15" y="20" fill="#fff" text-anchor="middle" font-size="20">+</text>`;
     }
   }
 
@@ -66,84 +81,91 @@ window.Tree = (function () {
       return;
     }
 
-    // первый запуск — узлы сразу в конструктор
     if (!family) {
       family = new window.FamilyTree(container, {
-        template: 'tommy',
+        template: 'shalom',
         nodeBinding: { field_0: 'name', field_1: 'subtitle' },
-
-        // управление/зум (безопасно для iOS)
-        mouseScrool: window.FamilyTree.action.zoom,  // именно "Scrool" — так в либе
-        minZoom: 0.5,
-        maxZoom: 2,
-        scaleInitial: window.innerWidth < 768 ? 0.8 : 1,
-
-        // отступы
-        siblingSeparation: 80,
-        levelSeparation: 70,
-        subtreeSeparation: 100,
-
+        mouseScrool: window.FamilyTree.action.zoom,
+        minZoom: .5, maxZoom: 2, scaleInitial: window.innerWidth < 768 ? 0.8 : 1,
+        siblingSeparation: 90, levelSeparation: 80, subtreeSeparation: 110,
         roots: data.rootNum ? [data.rootNum] : undefined,
         nodes: data.nodes,
-
-        nodeMouseClick: (args) => {
-          if (args && args.node) openProfile(data.num2id.get(args.node.id));
-        }
+        nodeMouseClick: (args) => { if (args && args.node) openProfile(data.num2id.get(args.node.id)); }
       });
     } else {
       family.load(data.nodes);
     }
   }
 
-  // ---- Адаптер: наши строки id -> числовые id; главное исправление: fid/mid ----
+  /* ===== Адаптер: строки -> числа + починка связей ===== */
   function buildBalkanData(DB) {
-    const id2num = new Map();
-    const num2id = new Map();
-    let seq = 1;
-
-    for (const u of DB.users) {
-      if (!id2num.has(u.id)) { id2num.set(u.id, seq); num2id.set(seq, u.id); seq++; }
-    }
+    // 1) маппинг строковых id -> чисел
+    const id2num = new Map(), num2id = new Map(); let seq = 1;
+    for (const u of DB.users) if (!id2num.has(u.id)) { id2num.set(u.id, seq); num2id.set(seq, u.id); seq++; }
     for (const r of DB.rels) {
       if (!id2num.has(r.a)) { id2num.set(r.a, seq); num2id.set(seq, r.a); seq++; }
       if (!id2num.has(r.b)) { id2num.set(r.b, seq); num2id.set(seq, r.b); seq++; }
     }
 
-    const parentsByChild = new Map(); // num(child) -> [num(parent)...]
+    // 2) индексы: родители/супруги/сиблинги
+    const parentsByChild = new Map(); // num(child) -> Set(num(parent))
     const partners = new Map();       // num -> Set(numPartner)
+    const siblings = [];              // [ [numA,numB], ... ]
 
     for (const r of DB.rels) {
       const a = id2num.get(r.a), b = id2num.get(r.b);
       if (r.type === 'parent') {
-        if (!parentsByChild.has(b)) parentsByChild.set(b, []);
-        parentsByChild.get(b).push(a);
+        setAdd(parentsByChild, b, a);
+      } else if (r.type === 'child') {
+        // учитываем child как parent->child
+        setAdd(parentsByChild, b, a);
       } else if (r.type === 'spouse') {
         if (!partners.has(a)) partners.set(a, new Set());
         if (!partners.has(b)) partners.set(b, new Set());
         partners.get(a).add(b); partners.get(b).add(a);
+      } else if (r.type === 'sibling') {
+        siblings.push([a, b]);
       }
     }
 
+    // 3) наследуем родителей через sibling (если у одного есть, у второго нет)
+    for (const [a, b] of siblings) {
+      const pa = parentsByChild.get(a), pb = parentsByChild.get(b);
+      if (pa && !pb) parentsByChild.set(b, new Set(pa));
+      if (pb && !pa) parentsByChild.set(a, new Set(pb));
+    }
+
+    // 4) собираем ноды
     const nodes = DB.users.map(u => {
       const num = id2num.get(u.id);
-      const ps = parentsByChild.get(num) || [];
-      const fid = ps[0];     // father   (ключ ДОЛЖЕН быть fid)
-      const mid = ps[1];     // mother   (ключ ДОЛЖЕН быть mid)
+      const ps = Array.from(parentsByChild.get(num) || []);
+      const fid = ps[0];  // father
+      const mid = ps[1];  // mother
       const pids = partners.has(num) ? Array.from(partners.get(num)) : undefined;
 
-      const subtitle = [u.dob ? fmt(u.dob) : '', u.dod ? `– ${fmt(u.dod)}` : ''].join(' ').trim();
+      const subtitle = [
+        u.dob ? fmt(u.dob) : '',
+        u.dod ? `– ${fmt(u.dod)}` : '',
+        u.city ? ` • ${u.city}` : ''
+      ].join(' ').trim();
+
       const n = { id: num, name: u.name, subtitle };
-      if (fid) n.fid = fid;           // <-- ИСПРАВЛЕНИЕ
-      if (mid) n.mid = mid;           //     ИСПРАВЛЕНИЕ
+      if (fid) n.fid = fid;
+      if (mid) n.mid = mid;
       if (pids && pids.length) n.pids = pids;
       return n;
     });
 
     const rootNum = id2num.get(DB.currentUserId);
     return { nodes, num2id, rootNum };
+
+    function setAdd(map, key, val){
+      if (!map.has(key)) map.set(key, new Set());
+      map.get(key).add(val);
+    }
   }
 
-  function fmt(iso) { if (!iso) return ''; const [y,m,d]=iso.split('-'); return `${d}.${m}.${y}`; }
+  function fmt(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); return `${d}.${m}.${y}`; }
 
   /* ======== UI: профиль / добавление ======== */
   function openProfile(id) {
@@ -152,7 +174,7 @@ window.Tree = (function () {
     const dod = u.dod ? (' – ' + fmt(u.dod)) : '';
     UI.sheet(`<div class="vstack">
       <div class="section-title">${u.name}</div>
-      <div class="small">${[dob,dod].join('')}</div>
+      <div class="small">${[dob,dod,u.city?` • ${u.city}`:''].join('')}</div>
       <div class="section-title">Действия</div>
       <div class="hstack">
         <button class="btn" onclick="Tree.openAdd('${id}')">Добавить родственника</button>
@@ -185,6 +207,7 @@ window.Tree = (function () {
       <div class="small muted">…или создать нового</div>
       <input id="rel_name" class="input" placeholder="ФИО">
       <input id="rel_dob" class="input" placeholder="Дата рождения (YYYY-MM-DD)">
+      <input id="rel_city" class="input" placeholder="Город (необязательно)">
 
       <select id="rel_type" class="select" onchange="Tree.openAdd('${me}', this.value)">
         <option value="parent" ${type==='parent'?'selected':''}>Мать/Отец</option>
@@ -255,11 +278,12 @@ window.Tree = (function () {
     if (!user) {
       const name = (document.getElementById('rel_name').value||'').trim();
       const dob  = (document.getElementById('rel_dob').value||'').trim();
+      const city = (document.getElementById('rel_city').value||'').trim();
       if (!name) { alert('Введите ФИО или выберите из списка.'); return; }
       const existing = findExisting(name, dob);
       user = existing && confirm(`Найден ${existing.name}${existing.dob?` • ${existing.dob}`:''}. Связать?`)
         ? existing
-        : ({ id: 'u'+(DB.users.length+1), name, dob });
+        : ({ id: 'u'+(DB.users.length+1), name, dob, city });
       if (!existing) DB.users.push(user);
     }
 
