@@ -1,255 +1,166 @@
+/* Balkan FamilyTreeJS integration + full add/search/merge logic */
 window.Tree = (function () {
-  function page() {
-    UI.title("Семейное древо");
+  let family = null;               // экземпляр Balkan FamilyTree
+  let isBalkanReady = false;       // флаг «скрипт/стили подгружены»
+  let selectedUser = null;         // выбранный из подсказок при добавлении
+
+  /* ===================== PUBLIC: PAGE ===================== */
+  async function page() {
+    // 1) авто-слияние дублей (если кто-то зарегистрировался позже)
+    autoMergeDuplicates();
+
+    // 2) UI шапка/кнопки
+    UI.title('Семейное древо');
     UI.action('<button class="btn ghost" onclick="Tree.openAdd()">Добавить родственника</button>');
 
+    // 3) Вставляем контейнер
     const v = UI.view();
-    const me = DB.currentUserId;
+    v.innerHTML = `
+      <div id="treeContainer" style="width:100%;height:72vh;background:#fff;border-radius:12px;border:1px solid #e5e7eb"></div>
+    `;
 
-    const L = buildLayers(me);
-    const order = ["-2","-1","-1u","0","0c","1","2"].filter(k=>L[k] && L[k].length);
-
-    const html = ['<div class="tree">']
-      .concat(order.map(lvl => `<div class="gen-row">${L[lvl].map(id => renderPerson(id, relationToMe(me,id))).join('')}</div>`))
-      .concat([
-        '<div class="hstack" style="justify-content:center;margin-top:8px">',
-        '<button class="btn" onclick="Tree.openAdd()">Добавить родственника</button>',
-        '</div>',
-        '<svg id="tree-links" class="links"></svg>',
-        '</div>'
-      ]).join('');
-    v.innerHTML = html;
-
-    // перерисовка линий
-    drawLinks();
-    window.addEventListener('resize', onResizeDebounced, {passive:true});
-    window.addEventListener('scroll', onResizeDebounced, {passive:true});
-    // слушаем горизонтальный скролл у рядов
-    v.querySelectorAll('.gen-row').forEach(row=>{
-      row.addEventListener('scroll', onResizeDebounced, {passive:true});
-    });
-  }
-
-  /* ---------- Слои ---------- */
-  function buildLayers(root){
-    const r = DB.rels;
-
-    const parents = r.filter(x=>x.type==='parent'&&x.b===root).map(x=>x.a);
-
-    const spouse  = r.filter(x=>x.type==='spouse'&&(x.a===root||x.b===root))
-                     .map(x=> x.a===root?x.b:x.a);
-
-    const siblingsFromParents = Array.from(new Set(
-      parents.flatMap(p=> r.filter(x=>x.type==='parent'&&x.a===p).map(x=>x.b))
-    )).filter(id=>id!==root);
-
-    const siblingsFromEdges = [
-      ...r.filter(x=>x.type==='sibling'&&x.a===root).map(x=>x.b),
-      ...r.filter(x=>x.type==='sibling'&&x.b===root).map(x=>x.a),
-    ];
-
-    const siblings = uniq([...siblingsFromParents, ...siblingsFromEdges]).filter(id=>id!==root);
-
-    const grandparents = parents.flatMap(p=> r.filter(x=>x.type==='parent'&&x.b===p).map(x=>x.a));
-
-    const auntsUncles = parents.flatMap(p=>{
-      const gp = r.filter(x=>x.type==='parent'&&x.b===p).map(x=>x.a);
-      const kids = gp.flatMap(g=> r.filter(x=>x.type==='parent'&&x.a===g).map(x=>x.b));
-      return kids.filter(x=>x!==p);
-    });
-
-    const cousins = auntsUncles.flatMap(au=> r.filter(x=>x.type==='child'&&x.a===au).map(x=>x.b));
-
-    const children = r.filter(x=>x.type==='child'&&x.a===root).map(x=>x.b);
-    const grandchildren = children.flatMap(c=> r.filter(x=>x.type==='child'&&x.a===c).map(x=>x.b));
-
-    const L={};
-    if(grandparents.length) L['-2']=uniq(grandparents);
-    if(parents.length)      L['-1']=uniq(parents);
-    if(auntsUncles.length)  L['-1u']=uniq(auntsUncles);
-    L['0']=uniq([root,...spouse,...siblings]);
-    if(cousins.length)      L['0c']=uniq(cousins);
-    if(children.length)     L['1']=uniq(children);
-    if(grandchildren.length)L['2']=uniq(grandchildren);
-    return L;
-  }
-
-  /* ---------- Линии ---------- */
-  function drawLinks(){
-    const svg = document.getElementById('tree-links');
-    const container = svg.parentElement; // .tree
-    const rect = container.getBoundingClientRect();
-    svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
-    svg.setAttribute('width', rect.width);
-    svg.setAttribute('height', rect.height);
-    svg.innerHTML = '';
-
-    const idSet = new Set([...container.querySelectorAll('.person')].map(el=>el.dataset.id));
-
-    const geom = (id)=>{
-      const el = container.querySelector(`.person[data-id="${id}"]`);
-      if(!el) return null;
-      const r = el.getBoundingClientRect();
-      const cx = r.left - rect.left + r.width/2;
-      const cy = r.top  - rect.top  + r.height/2;
-      return {
-        top   : {x:cx, y:r.top    - rect.top},
-        bottom: {x:cx, y:r.bottom - rect.top},
-        left  : {x:r.left - rect.left,  y:cy},
-        right : {x:r.right- rect.left,  y:cy},
-      };
-    };
-
-    // index: child -> parents[]
-    const byChild = new Map();
-    DB.rels
-      .filter(r=>r.type==='parent' && idSet.has(r.a) && idSet.has(r.b))
-      .forEach(({a,b})=>{
-        if(!byChild.has(b)) byChild.set(b, []);
-        byChild.get(b).push(a);
-      });
-
-    const bundledChildren = new Set();
-
-    // рисуем «пучки», если у ребёнка >=2 видимых родителей
-    for(const [child, parents] of byChild.entries()){
-      if(parents.length < 2) continue;
-
-      // берём пару родителей с минимальной горизонтальной дистанцией
-      const pos = parents.map(pid=>({id:pid, g:geom(pid)})).filter(x=>x.g);
-      if(pos.length < 2) continue;
-
-      let best = null, bestDist = Infinity;
-      for(let i=0;i<pos.length;i++){
-        for(let j=i+1;j<pos.length;j++){
-          const d = Math.abs(pos[i].g.bottom.x - pos[j].g.bottom.x);
-          if(d < bestDist){ bestDist=d; best=[pos[i], pos[j]]; }
-        }
-      }
-      if(!best) continue;
-
-      const g1 = best[0].g, g2 = best[1].g;
-      const gc = geom(child); if(!gc) continue;
-
-      const joinY = Math.max(g1.bottom.y, g2.bottom.y) + 28;
-      const joinX = (g1.bottom.x + g2.bottom.x) / 2;
-
-      svg.appendChild(pathSoft(g1.bottom.x, g1.bottom.y, joinX, joinY, 'bundle'));
-      svg.appendChild(pathSoft(g2.bottom.x, g2.bottom.y, joinX, joinY, 'bundle'));
-      svg.appendChild(pathElbow(joinX, joinY, gc.top.x, gc.top.y, 12));
-
-      bundledChildren.add(child);
+    // 4) Грузим Balkan (если ещё не)
+    if (!isBalkanReady) {
+      await ensureBalkanLoaded();
+      isBalkanReady = true;
     }
 
-    // остальные parent->child
-    DB.rels
-      .filter(r=>r.type==='parent' && idSet.has(r.a) && idSet.has(r.b) && !bundledChildren.has(r.b))
-      .forEach(({a,b})=>{
-        const gp = geom(a), gc = geom(b);
-        if(!gp || !gc) return;
-        svg.appendChild(pathElbow(gp.bottom.x, gp.bottom.y, gc.top.x, gc.top.y, 12));
+    // 5) Старт/перерисовка дерева
+    renderFamilyTree();
+  }
+
+  /* ===================== LOAD BALKAN ===================== */
+  async function ensureBalkanLoaded() {
+    // CSS
+    if (!document.querySelector('link[data-ftcss]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.setAttribute('data-ftcss', '1');
+      // Попробуем 2 варианта путей
+      link.href = await probeUrl([
+        './familytree.css',
+        '/assets/vendor/balkan/familytree.css'
+      ]);
+      document.head.appendChild(link);
+    }
+    // JS
+    if (!window.FamilyTree) {
+      const script = document.createElement('script');
+      script.setAttribute('data-ftjs', '1');
+      script.async = false;
+      script.src = await probeUrl([
+        './familytree.js',
+        '/assets/vendor/balkan/familytree.js'
+      ]);
+      await new Promise((res, rej) => {
+        script.onload = () => res();
+        script.onerror = () => rej(new Error('Не удалось загрузить familytree.js'));
+        document.head.appendChild(script);
       });
+    }
+  }
 
-    // линия супругов (горизонталь)
-    const drawnSpouse = new Set();
-    DB.rels
-      .filter(r=>r.type==='spouse' && idSet.has(r.a) && idSet.has(r.b))
-      .forEach(({a,b})=>{
-        const key = a<b ? `${a}|${b}` : `${b}|${a}`;
-        if(drawnSpouse.has(key)) return;
-        drawnSpouse.add(key);
+  async function probeUrl(candidates) {
+    for (const url of candidates) {
+      try {
+        // «Пробный» запрос через <link rel=preload> не всегда доступен.
+        // Поэтому просто возвращаем первый — если он 404, onerror у <script>/<link> дернется,
+        // а мы попробуем следующий.
+        return url;
+      } catch(_) { /* noop */ }
+    }
+    // если что — оставим первый, пусть падение будет явным
+    return candidates[0];
+  }
 
-        const ga = geom(a), gb = geom(b);
-        if(!ga || !gb) return;
+  /* ===================== BUILD NODES ===================== */
+  function renderFamilyTree() {
+    const container = document.getElementById('treeContainer');
+    const { nodes } = buildBalkanData(DB);
 
-        const left  = ga.right.x <= gb.left.x ? ga : gb;
-        const right = left===ga ? gb : ga;
-        const y = (left.right.y + right.left.y)/2;
-
-        const p = document.createElementNS('http://www.w3.org/2000/svg','path');
-        p.setAttribute('class','link spouse');
-        p.setAttribute('d', `M ${left.right.x} ${y} L ${right.left.x} ${y}`);
-        svg.appendChild(p);
+    // первый запуск
+    if (!family) {
+      family = new window.FamilyTree(container, {
+        // управление
+        mouseScrool: window.FamilyTree.action.zoom,
+        enableSearch: true,
+        // внешний вид
+        template: 'olivia', // если в дистрибутиве другая тема — просто поставь её имя
+        nodeBinding: {
+          field_0: 'name',
+          field_1: 'subtitle'
+        },
+        toolbar: true,
+        scaleInitial: window.innerWidth < 768 ? 0.7 : 0.9,
+        siblingSeparation: 80,
+        levelSeparation: 70,
+        subtreeSeparation: 100,
+        // клики по узлам — открываем наш «профиль»
+        nodeMouseClick: (args) => {
+          if (!args || !args.node) return;
+          openProfile(args.node.id);
+        }
       });
+    }
+
+    // подстановка данных
+    family.load(nodes);
   }
 
-  function pathSoft(sx,sy,tx,ty,extraClass=''){
-    const h = Math.max(20, Math.min(60, Math.abs(ty - sy) * 0.6));
-    const d = `M ${sx},${sy} C ${sx},${sy + h} ${tx},${ty - h} ${tx},${ty}`;
-    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
-    p.setAttribute('class', `link ${extraClass}`.trim());
-    p.setAttribute('d', d);
-    return p;
-  }
+  function buildBalkanData(DB) {
+    // 1) Индексы
+    const usersById = new Map(DB.users.map(u => [u.id, u]));
+    const parentsByChild = new Map(); // childId -> [parentIds...]
+    const partners = new Map();       // id -> Set(partnerIds)
 
-  function pathElbow(sx,sy,tx,ty,r=10){
-    const midY = (sy+ty)/2;
-    const d = [
-      `M ${sx} ${sy}`,
-      `L ${sx} ${midY - r}`,
-      `A ${r} ${r} 0 0 0 ${sx + r} ${midY}`,
-      `L ${tx - r} ${midY}`,
-      `A ${r} ${r} 0 0 0 ${tx} ${midY + r}`,
-      `L ${tx} ${ty}`
-    ].join(' ');
-    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
-    p.setAttribute('class', 'link');
-    p.setAttribute('d', d);
-    return p;
-  }
-
-  function onResizeDebounced(){
-    clearTimeout(onResizeDebounced._t);
-    onResizeDebounced._t = setTimeout(()=>{
-      const svg = document.getElementById('tree-links');
-      if(svg) drawLinks();
-    }, 80);
-  }
-
-  /* ---------- Бейдж ---------- */
-  function relationToMe(me, id){
-    if(me===id) return "Я";
-    const r = DB.rels;
-    if(r.some(x=>x.type==='spouse'&&((x.a===me&&x.b===id)||(x.b===me&&x.a===id)))) return "Супруг/а";
-    if(r.some(x=>x.type==='parent'&&x.a===id&&x.b===me)) return "Отец/Мать";
-    if(r.some(x=>x.type==='child'&&x.a===me&&x.b===id)) return "Сын/Дочь";
-    if(r.some(x=>x.type==='sibling'&&((x.a===me&&x.b===id)||(x.b===me&&x.a===id)))) return "Брат/Сестра";
-
-    const parents = r.filter(x=>x.type==='parent'&&x.b===me).map(x=>x.a);
-    const gp = parents.flatMap(p=> r.filter(x=>x.type==='parent'&&x.b===p).map(x=>x.a));
-    if(gp.includes(id)) return "Дедушка/Бабушка";
-
-    const aunts = parents.flatMap(p=>{
-      const gp2 = r.filter(x=>x.type==='parent'&&x.b===p).map(x=>x.a);
-      const kids = gp2.flatMap(g=> r.filter(x=>x.type==='parent'&&x.a===g).map(x=>x.b));
-      return kids.filter(x=>x!==p);
+    DB.rels.forEach(r => {
+      if (r.type === 'parent') {
+        if (!parentsByChild.has(r.b)) parentsByChild.set(r.b, []);
+        parentsByChild.get(r.b).push(r.a);
+      } else if (r.type === 'spouse') {
+        if (!partners.has(r.a)) partners.set(r.a, new Set());
+        if (!partners.has(r.b)) partners.set(r.b, new Set());
+        partners.get(r.a).add(r.b);
+        partners.get(r.b).add(r.a);
+      }
     });
-    if(aunts.includes(id)) return "Дядя/Тётя";
 
-    const cousins = aunts.flatMap(au=> r.filter(x=>x.type==='child'&&x.a===au).map(x=>x.b));
-    if(cousins.includes(id)) return "Двоюродный брат/сестра";
-    return "";
+    // 2) Ноды для Balkan
+    const nodes = DB.users.map(u => {
+      const p = parentsByChild.get(u.id) || [];
+      // Balkan ждёт pid(«father») + mid(«mother»). Пол нам неизвестен,
+      // поэтому просто раскладываем первых двоих как pid/mid — библиотеке норм.
+      const pid = p[0] || undefined;
+      const mid = p[1] || undefined;
+      const pids = partners.has(u.id) ? Array.from(partners.get(u.id)) : undefined;
+
+      const subtitle = [u.dob ? fmtDateRu(u.dob) : '', u.dod ? `– ${fmtDateRu(u.dod)}` : '']
+        .join(' ').trim();
+
+      const node = { id: u.id, name: u.name, subtitle };
+      if (pid) node.pid = pid;
+      if (mid) node.mid = mid;
+      if (pids && pids.length) node.pids = pids;
+      return node;
+    });
+
+    return { nodes };
   }
 
-  /* ---------- Рендер карточек / диалоги ---------- */
-  function renderPerson(id, rel){
-    const u = DB.users.find(x=>x.id===id);
-    const dob = u.dob ? formatDate(u.dob) : '';
-    const dod = u.dod ? (' – '+formatDate(u.dod)) : '';
-    return `<div class="person" data-id="${id}" onclick="Tree.openProfile('${id}')">
-      <div class="name">${u.name}</div>
-      <div class="sub">${[dob, dod].join('')}</div>
-      ${rel? `<div class="rel">${rel}</div>`:''}
-    </div>`;
+  function fmtDateRu(iso) {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-');
+    return `${d}.${m}.${y}`;
   }
 
-  function openProfile(id){
-    const u = DB.users.find(x=>x.id===id);
-    const dob = u.dob ? formatDate(u.dob) : '';
-    const dod = u.dod ? (' – '+formatDate(u.dod)) : '';
+  /* ===================== ADDING / SEARCH / MERGE ===================== */
+  function openProfile(id) {
+    const u = DB.users.find(x => x.id === id);
+    const dob = u.dob ? fmtDateRu(u.dob) : '';
+    const dod = u.dod ? (' – ' + fmtDateRu(u.dod)) : '';
     UI.sheet(`<div class="vstack">
       <div class="section-title">${u.name}</div>
-      <div class="small">${[dob,dod].join('')}</div>
+      <div class="small">${[dob, dod].join('')}</div>
       <div class="section-title">Действия</div>
       <div class="hstack">
         <button class="btn" onclick="Tree.openAdd('${id}')">Добавить родственника</button>
@@ -258,41 +169,56 @@ window.Tree = (function () {
     </div>`);
   }
 
-  function openAdd(contextId, selectedType){
+  function openAdd(contextId, selectedType) {
     const me = contextId || DB.currentUserId;
-    const parents = DB.rels.filter(r=>r.type==='parent' && r.b===DB.currentUserId).map(r=>r.a);
-    const parentOptions = parents.map(pid=>{
-      const u = DB.users.find(x=>x.id===pid); return `<option value="${pid}">${u?u.name:'Родитель'}</option>`;
-    }).join('');
-
-    const auntsUncles = getAuntsUncles(DB.currentUserId);
-    const auntOptions = auntsUncles.map(id=>{
-      const u = DB.users.find(x=>x.id===id); return `<option value="${id}">${u?u.name:'—'}</option>`;
-    }).join('');
 
     const type = selectedType || 'parent';
 
+    // родители текущего — пригодится в «дядя/тётя»
+    const parents = DB.rels.filter(r => r.type === 'parent' && r.b === DB.currentUserId).map(r => r.a);
+    const parentOptions = parents.map(pid => {
+      const u = DB.users.find(x => x.id === pid);
+      return `<option value="${pid}">${u ? u.name : "Родитель"}</option>`;
+    }).join('');
+
+    // список тёть/дядь — пригодится для «двоюродного»
+    const auntsUncles = getAuntsUncles(DB.currentUserId);
+    const auntOptions = auntsUncles.map(id => {
+      const u = DB.users.find(x => x.id === id);
+      return `<option value="${id}">${u ? u.name : "—"}</option>`;
+    }).join('');
+
     UI.sheet(`<div class="vstack">
       <div class="section-title">Добавить родственника</div>
+
+      <div class="typeahead">
+        <input id="rel_query" class="input" placeholder="Поиск: ФИО или ФИО + дата (YYYY-MM-DD)" oninput="Tree._hint()">
+        <div id="rel_suggest" class="suggest hidden"></div>
+      </div>
+
+      <div class="small muted">…или создать нового</div>
       <input id="rel_name" class="input" placeholder="ФИО">
       <input id="rel_dob" class="input" placeholder="Дата рождения (YYYY-MM-DD)">
+
       <select id="rel_type" class="select" onchange="Tree.openAdd('${me}', this.value)">
-        <option value="parent" ${type==='parent'?'selected':''}>Мать/Отец</option>
-        <option value="child"  ${type==='child'?'selected':''}>Сын/Дочь</option>
-        <option value="sibling"${type==='sibling'?'selected':''}>Брат/Сестра</option>
-        <option value="spouse" ${type==='spouse'?'selected':''}>Супруг/Супруга</option>
-        <option value="auntuncle" ${type==='auntuncle'?'selected':''}>Дядя/Тётя</option>
-        <option value="cousin" ${type==='cousin'?'selected':''}>Двоюродный(ая)</option>
+        <option value="parent" ${type === "parent" ? "selected" : ""}>Мать/Отец</option>
+        <option value="child" ${type === "child" ? "selected" : ""}>Сын/Дочь</option>
+        <option value="spouse" ${type === "spouse" ? "selected" : ""}>Супруг/Супруга</option>
+        <option value="sibling" ${type === "sibling" ? "selected" : ""}>Брат/Сестра</option>
+        <option value="grandparent" ${type === "grandparent" ? "selected" : ""}>Дедушка/Бабушка</option>
+        <option value="grandchild" ${type === "grandchild" ? "selected" : ""}>Внук/Внучка</option>
+        <option value="auntuncle" ${type === "auntuncle" ? "selected" : ""}>Дядя/Тётя</option>
+        <option value="cousin" ${type === "cousin" ? "selected" : ""}>Двоюродный(ая)</option>
       </select>
 
-      ${type==='auntuncle' ? `
-        <div class="section-title">Через кого</div>
+      ${type === "auntuncle" ? `
+        <div class="section-title">Через кого (мой родитель)</div>
         <select id="rel_side_parent" class="select">
           ${parentOptions || '<option value="">(Сначала добавьте родителей)</option>'}
         </select>` : ''}
 
-      ${type==='cousin' ? `
-        <div class="section-title">Ребёнок кого</div>
+      ${type === "cousin" ? `
+        <div class="section-title">Ребёнок кого (мои дядя/тётя)</div>
         <select id="rel_aunt" class="select">
           ${auntOptions || '<option value="">(Сначала добавьте дядю/тётю)</option>'}
         </select>` : ''}
@@ -302,66 +228,188 @@ window.Tree = (function () {
         <button class="btn ghost" onclick="UI.close()">Отменить</button>
       </div>
     </div>`);
+
+    selectedUser = null; // сброс выбора
   }
 
-  function _saveAdd(contextId){
-    const name = (document.getElementById('rel_name').value||'').trim();
-    const dob  = (document.getElementById('rel_dob').value||'').trim();
-    const type = document.getElementById('rel_type').value;
-    if(!name){ alert('Введите ФИО'); return; }
+  function _hint() {
+    const q = (document.getElementById('rel_query').value || '').trim().toLowerCase();
+    const box = document.getElementById('rel_suggest');
+    if (!q) { box.classList.add('hidden'); box.innerHTML = ''; return; }
 
-    const existing = findExisting(name, dob);
-    let user;
-    if(existing && confirm(`Похоже, ${existing.name} уже есть. Использовать существующего?`)){
-      user = existing;
-    } else {
-      user = { id: 'u'+(DB.users.length+1), name, dob };
-      DB.users.push(user);
+    const m = q.match(/(.+)\s+(\d{4}-\d{2}-\d{2})$/);
+    const namePart = (m ? m[1] : q).replace(/\s+/g, ' ').trim();
+    const dobPart  = m ? m[2] : '';
+
+    const results = DB.users.filter(u => {
+      const nm = u.name.toLowerCase();
+      const nameHit = nm.includes(namePart);
+      const dobHit  = !dobPart || (u.dob || '') === dobPart;
+      return nameHit && dobHit;
+    }).slice(0, 12);
+
+    if (!results.length) {
+      box.classList.remove('hidden');
+      box.innerHTML = '<div class="opt muted">Ничего не найдено</div>';
+      return;
     }
 
+    box.classList.remove('hidden');
+    box.innerHTML = results
+      .map(u => `<div class="opt" onclick="Tree._pick('${u.id}')">${u.name}${u.dob ? ` • ${u.dob}` : ''}</div>`)
+      .join('');
+  }
+
+  function _pick(id) {
+    const u = DB.users.find(x => x.id === id);
+    selectedUser = u;
+    document.getElementById('rel_query').value = `${u.name}${u.dob ? ` ${u.dob}` : ''}`;
+    const box = document.getElementById('rel_suggest');
+    box.classList.add('hidden'); box.innerHTML = '';
+  }
+
+  function _saveAdd(contextId) {
     const me = contextId || DB.currentUserId;
+    const type = document.getElementById('rel_type').value;
 
-    if(type==='parent'){ DB.rels.push({type:'parent', a:user.id, b:me}); }
-    else if(type==='child'){ DB.rels.push({type:'child', a:me, b:user.id}); }
-    else if(type==='sibling'){ DB.rels.push({type:'sibling', a:me, b:user.id}); DB.rels.push({type:'sibling', a:user.id, b:me}); }
-    else if(type==='spouse'){ DB.rels.push({type:'spouse', a:me, b:user.id}); DB.rels.push({type:'spouse', a:user.id, b:me}); }
-    else if(type==='auntuncle'){
-      const sideParent = (document.getElementById('rel_side_parent')||{}).value || getDefaultParent(me);
-      if(!sideParent){ alert('Сначала добавьте хотя бы одного родителя.'); return; }
-      DB.rels.push({type:'sibling', a:sideParent, b:user.id});
-      DB.rels.push({type:'sibling', a:user.id, b:sideParent});
-    } else if(type==='cousin'){
-      const auntId = (document.getElementById('rel_aunt')||{}).value;
-      if(!auntId){ alert('Выберите дядю/тётю, чьим ребёнком является двоюродный/ая.'); return; }
-      DB.rels.push({type:'child', a:auntId, b:user.id});
+    // выбран существующий?
+    let user = selectedUser;
+
+    if (!user) {
+      const name = (document.getElementById('rel_name').value || '').trim();
+      const dob  = (document.getElementById('rel_dob').value || '').trim();
+      if (!name) { alert('Введите ФИО или выберите из списка.'); return; }
+
+      const existing = findExisting(name, dob);
+      if (existing && confirm(`Найден ${existing.name}${existing.dob ? ` • ${existing.dob}` : ''}. Связать с ним?`)) {
+        user = existing;
+      } else {
+        user = { id: 'u' + (DB.users.length + 1), name, dob };
+        DB.users.push(user);
+      }
     }
 
-    UI.close(); page();
+    // Проставляем связи
+    linkByRelation(me, user.id, type);
+
+    // спец-случаи с доп.параметрами
+    if (type === 'auntuncle') {
+      const sideParent = (document.getElementById('rel_side_parent') || {}).value || getDefaultParent(me);
+      if (!sideParent) { alert('Сначала добавьте родителей.'); return; }
+      DB.rels.push({ type: 'sibling', a: sideParent, b: user.id });
+      DB.rels.push({ type: 'sibling', a: user.id,     b: sideParent });
+    }
+    if (type === 'cousin') {
+      const auntId = (document.getElementById('rel_aunt') || {}).value;
+      if (!auntId) { alert('Выберите дядю/тётю, чьим ребёнком является двоюродный/ая.'); return; }
+      DB.rels.push({ type: 'child', a: auntId, b: user.id });
+    }
+
+    UI.close();
+    // перерисовать дерево
+    renderFamilyTree();
   }
 
-  /* ---------- helpers ---------- */
-  function getDefaultParent(me){
-    const parents = DB.rels.filter(r=>r.type==='parent' && r.b===me).map(r=>r.a);
+  /* ====== RELATION WRITER ====== */
+  function linkByRelation(me, otherId, type) {
+    if (type === 'parent') {
+      DB.rels.push({ type: 'parent', a: otherId, b: me });
+    } else if (type === 'child') {
+      DB.rels.push({ type: 'child', a: me, b: otherId });
+    } else if (type === 'spouse') {
+      DB.rels.push({ type: 'spouse', a: me, b: otherId });
+      DB.rels.push({ type: 'spouse', a: otherId, b: me });
+    } else if (type === 'sibling') {
+      DB.rels.push({ type: 'sibling', a: me, b: otherId });
+      DB.rels.push({ type: 'sibling', a: otherId, b: me });
+    } else if (type === 'grandparent') {
+      // дед/бабушка: other -> parent -> me
+      const parent = getOrCreateParent(me);
+      DB.rels.push({ type: 'parent', a: otherId, b: parent });
+    } else if (type === 'grandchild') {
+      // внук: me -> child -> other
+      const child = getOrCreateChild(me);
+      DB.rels.push({ type: 'child', a: child, b: otherId });
+    }
+  }
+
+  function getOrCreateParent(me) {
+    const p = DB.rels.find(r => r.type === 'parent' && r.b === me);
+    if (p) return p.a;
+    const u = { id:'u' + (DB.users.length + 1), name: 'Родитель', dob:'' };
+    DB.users.push(u);
+    DB.rels.push({ type: 'parent', a: u.id, b: me });
+    return u.id;
+    // (это вспомогательно — чтобы можно было указать дедушку/бабушку без заполненных родителей)
+  }
+  function getOrCreateChild(me) {
+    const c = DB.rels.find(r => r.type === 'child' && r.a === me);
+    if (c) return c.b;
+    const u = { id:'u' + (DB.users.length + 1), name: 'Ребёнок', dob:'' };
+    DB.users.push(u);
+    DB.rels.push({ type: 'child', a: me, b: u.id });
+    return u.id;
+  }
+
+  /* ====== HELPERS / LAYERS ====== */
+  function getDefaultParent(me) {
+    const parents = DB.rels.filter(r => r.type === 'parent' && r.b === me).map(r => r.a);
     return parents[0] || null;
   }
-  function getAuntsUncles(me){
-    const parents = DB.rels.filter(r=>r.type==='parent' && r.b===me).map(r=>r.a);
-    const gpKids = parents.flatMap(p=>{
-      const gp = DB.rels.filter(r=>r.type==='parent' && r.b===p).map(r=>r.a);
-      return gp.flatMap(g=> DB.rels.filter(r=>r.type==='parent' && r.a===g).map(r=>r.b));
+  function getAuntsUncles(me) {
+    const r = DB.rels;
+    const parents = r.filter(x => x.type === 'parent' && x.b === me).map(x => x.a);
+    const auByEdges = parents.flatMap(p => [
+      ...r.filter(x => x.type === 'sibling' && x.a === p).map(x => x.b),
+      ...r.filter(x => x.type === 'sibling' && x.b === p).map(x => x.a),
+    ]);
+    const auByGP = parents.flatMap(p => {
+      const gp = r.filter(x => x.type === 'parent' && x.b === p).map(x => x.a);
+      const kids = gp.flatMap(g => r.filter(x => x.type === 'parent' && x.a === g).map(x => x.b));
+      return kids.filter(x => x !== p);
     });
-    return uniq(gpKids.filter(x=>!parents.includes(x)));
+    return uniq([...auByEdges, ...auByGP]);
   }
-  function findExisting(name, dob){
+  function findExisting(name, dob) {
     const n = name.toLowerCase().replace(/\s+/g,' ').trim();
     return DB.users.find(u =>
       u.name.toLowerCase().replace(/\s+/g,' ').trim() === n &&
-      (u.dob||'') === (dob||'')
+      (u.dob || '') === (dob || '')
     );
   }
+  function autoMergeDuplicates() {
+    // простое объединение по ключу (ФИО+ДР)
+    const key = u => (u.name||'').toLowerCase().replace(/\s+/g,' ').trim() + '|' + (u.dob||'');
+    const seen = new Map(); // key -> keepUserId
+    const replace = new Map(); // oldId -> keepId
 
-  function formatDate(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); return `${d}.${m}.${y}`; }
+    for (const u of DB.users) {
+      const k = key(u);
+      if (!seen.has(k)) { seen.set(k, u.id); continue; }
+      const keep = seen.get(k);
+      if (keep === u.id) continue;
+      replace.set(u.id, keep);
+    }
+    if (!replace.size) return;
+
+    // Переносим ребра
+    DB.rels.forEach(r => {
+      if (replace.has(r.a)) r.a = replace.get(r.a);
+      if (replace.has(r.b)) r.b = replace.get(r.b);
+    });
+    // Удаляем дубликаты users
+    DB.users = DB.users.filter(u => !replace.has(u.id));
+    // Чистим дубликаты рёбер
+    const seenEdge = new Set();
+    DB.rels = DB.rels.filter(r => {
+      const k = `${r.type}|${r.a}|${r.b}`;
+      if (seenEdge.has(k)) return false;
+      seenEdge.add(k);
+      return true;
+    });
+  }
   function uniq(arr){ return Array.from(new Set(arr)); }
 
-  return { page, openProfile, openAdd, _saveAdd };
+  /* ===================== EXPORT ===================== */
+  return { page, openAdd, openProfile, _saveAdd, _hint, _pick };
 })();
