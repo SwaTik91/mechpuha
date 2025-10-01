@@ -5,7 +5,7 @@ window.Tree = (function(){
     const v = UI.view();
     const me = DB.currentUserId;
 
-    const L = buildLayers(me); // слои: -1 родители, 0 я/супруг/сиблинги, 1 дети, 2 внуки
+    const L = buildLayers(me);
     const order = ['-2','-1','0','1','2'].filter(k=>L[k] && L[k].length);
 
     const html = ['<div class="tree">']
@@ -14,6 +14,7 @@ window.Tree = (function(){
         const arrow = (i < order.length - 1) ? `<div class="arrow-row"><div class="arrow"></div></div>` : '';
         return row + arrow;
       }))
+      .concat(['<div class="hstack" style="justify-content:center"><button class="btn" onclick="Tree.openAdd()">Добавить родственника</button></div>'])
       .concat(['</div>'])
       .join('');
 
@@ -28,11 +29,10 @@ window.Tree = (function(){
     const children  = r.filter(x=>x.type==='child'&&x.a===root).map(x=>x.b);
     const grandchildren = children.flatMap(c=> r.filter(x=>x.type==='child'&&x.a===c).map(x=>x.b));
     const grandparents  = parents.flatMap(p=> r.filter(x=>x.type==='parent'&&x.b===p).map(x=>x.a));
-
     const L={};
     if(grandparents.length) L['-2']=uniq(grandparents);
     if(parents.length)      L['-1']=uniq(parents);
-    L['0']=uniq([root,...spouse,...siblings]);     // центр: Я + супруг/сиблинги
+    L['0']=uniq([root,...spouse,...siblings]);
     if(children.length)     L['1']=uniq(children);
     if(grandchildren.length)L['2']=uniq(grandchildren);
     return L;
@@ -54,7 +54,7 @@ window.Tree = (function(){
   function renderPerson(id, rel){
     const u = DB.users.find(x=>x.id===id);
     const dob = u.dob ? formatDate(u.dob) : '';
-    const dod = u.dod ? (' • † '+formatDate(u.dod)) : '';
+    const dod = u.dod ? (' – '+formatDate(u.dod)) : '';
     return `<div class="person" onclick="Tree.openProfile('${id}')">
       <div class="name">${u.name}</div>
       <div class="sub">${[dob, dod].join('')}</div>
@@ -65,14 +65,14 @@ window.Tree = (function(){
   function openProfile(id){
     const u = DB.users.find(x=>x.id===id);
     const dob = u.dob ? formatDate(u.dob) : '';
-    const dod = u.dod ? (' • † '+formatDate(u.dod)) : '';
+    const dod = u.dod ? (' – '+formatDate(u.dod)) : '';
     UI.sheet(`<div class="vstack">
       <div class="section-title">${u.name}</div>
       <div class="small">${[dob,dod].join('')}</div>
       <div class="section-title">Действия</div>
       <div class="hstack">
         <button class="btn" onclick="Tree.openAdd('${id}')">Добавить родственника</button>
-        <button class="btn ghost" onclick="UI.close()">Закрыть</button>
+        <button class="btn ghost" onclick="UI.close()">Отменить</button>
       </div>
     </div>`);
   }
@@ -110,13 +110,7 @@ window.Tree = (function(){
     UI.close(); page();
   }
 
-  function formatDate(iso){
-    // "YYYY-MM-DD" -> "DD.MM.YYYY"
-    if(!iso) return '';
-    const [y,m,d] = iso.split('-');
-    return `${d}.${m}.${y}`;
-  }
-
+  function formatDate(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); return `${d}.${m}.${y}`; }
   function uniq(arr){ return Array.from(new Set(arr)); }
   return { page, openProfile, openAdd, _saveAdd };
 })();
