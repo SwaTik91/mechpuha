@@ -38,7 +38,7 @@ a{color:inherit;text-decoration:none}
 #title{ font-weight:700; letter-spacing:.2px; font-size:18px; }
 #header-action{ min-width:24px; min-height:24px }
 
-/* ========= View (main content) ========= */
+/* ========= View ========= */
 .view{ flex:1 1 auto; padding:16px; padding-bottom:96px; }
 
 /* ========= Tabbar ========= */
@@ -58,7 +58,7 @@ a{color:inherit;text-decoration:none}
 .tab img{ width:22px; height:22px; display:block }
 .tab.active{ color:var(--brand); background:linear-gradient(0deg, rgba(255,122,0,.08), rgba(255,122,0,.08)); }
 
-/* ========= Cards / Lists / Items ========= */
+/* ========= Cards / Lists ========= */
 .card{
   background:var(--card);
   border:1px solid var(--border);
@@ -112,7 +112,7 @@ button{ font:inherit; }
   background:var(--card); border-top-left-radius:20px; border-top-right-radius:20px;
   box-shadow: 0 -12px 32px rgba(0,0,0,.18); max-height: 85dvh; display:flex; flex-direction:column;
 }
-.sheet:not(.hidden){ transform: translateY(0) }
+.sheet.visible{ transform: translateY(0) }
 .sheet-handle{ width:44px; height:5px; border-radius:999px; background:#d1d5db; margin:8px auto; }
 #sheet-content{ padding:8px 16px 16px; overflow:auto }
 
@@ -120,13 +120,13 @@ button{ font:inherit; }
   position:fixed; inset:0; background: rgba(0,0,0,.35);
   opacity:0; pointer-events:none; transition: opacity .25s ease; z-index:35;
 }
-.backdrop:not(.hidden){ opacity:1; pointer-events:auto; }
+.backdrop.visible{ opacity:1; pointer-events:auto; }
 
 /* ========= Feed specifics ========= */
 .kv{ display:grid; grid-template-columns: 140px 1fr; gap:8px; }
 .kv > div:nth-child(odd){ color:var(--muted) }
 
-/* ========= Typeahead (events) ========= */
+/* ========= Typeahead ========= */
 .typeahead{ position:relative }
 .suggest{
   position:absolute; left:0; right:0; top:100%; z-index:5;
@@ -137,8 +137,24 @@ button{ font:inherit; }
 .opt:hover{ background:#fff7f0 }
 
 /* ========= Tree (genealogy) ========= */
-.tree-grid{ display:flex; flex-direction:column; gap:18px; }
-.generation{ display:flex; flex-wrap:wrap; justify-content:center; gap:12px; position:relative; }
+/* Колонки по поколениям + стрелки между рядами */
+.tree{
+  display:flex; flex-direction:column; gap:14px;
+}
+.gen-row{
+  display:flex; flex-wrap:wrap; justify-content:center; gap:12px; position:relative;
+}
+
+.arrow-row{
+  display:flex; justify-content:center; align-items:center; height:18px;
+}
+.arrow{
+  width:0; height:0;
+  border-left:8px solid transparent; border-right:8px solid transparent;
+  border-top:12px solid #c5c5c5;
+  filter: drop-shadow(0 1px 0 rgba(0,0,0,.08));
+}
+
 .person{
   min-width:220px; max-width:260px;
   background:#fff; border:1px solid var(--border); border-radius:14px; padding:12px 14px;
@@ -147,12 +163,8 @@ button{ font:inherit; }
 .person .name{ font-weight:700; }
 .person .sub{ color:var(--muted); font-size:12px; margin-top:4px }
 .person .rel{ margin-top:6px; font-size:12px; background:#fff6ee; color:#a24a00; display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid #ffd7b0 }
-.arrow-down{
-  width:0; height:0; border-left:8px solid transparent; border-right:8px solid transparent;
-  border-top:12px solid #d8d8d8; margin: 0 auto;
-}
 
-/* ========= Login patch (из твоего предыдущего файла) ========= */
+/* ========= Login patch ========= */
 .login-search{position:sticky; top:0; background:#fff; padding:8px; border-bottom:1px solid #eee; z-index:2}
 .login-list{max-height:60vh; overflow:auto; background:#fff; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,.06)}
 .login-item{padding:10px 12px; border-bottom:1px solid #f2f2f2; cursor:pointer}
