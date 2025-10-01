@@ -1,4 +1,4 @@
-/* Balkan FamilyTreeJS integration (fixed: numeric ids) */
+/* Balkan FamilyTreeJS integration (fid/mid + iPhone touch fix) */
 window.Tree = (function () {
   let family = null;
   let isBalkanReady = false;
@@ -9,8 +9,14 @@ window.Tree = (function () {
 
     UI.title('Семейное древо');
     UI.action('<button class="btn ghost" onclick="Tree.openAdd()">Добавить родственника</button>');
+
     const v = UI.view();
-    v.innerHTML = `<div id="treeContainer" style="width:100%;height:72vh;background:#fff;border-radius:12px;border:1px solid #e5e7eb"></div>`;
+    // контейнер с безопасными для iOS стилями (чтобы клики не блокировались)
+    v.innerHTML = `
+      <div id="treeContainer"
+           style="width:100%;height:72vh;background:#fff;border-radius:12px;border:1px solid #e5e7eb;
+                  position:relative;overflow:hidden;touch-action:pan-y;">
+      </div>`;
 
     if (!isBalkanReady) {
       await ensureBalkanLoaded();
@@ -20,84 +26,92 @@ window.Tree = (function () {
   }
 
   async function ensureBalkanLoaded() {
+    // CSS
     if (!document.querySelector('link[data-ftcss]')) {
       const link = document.createElement('link');
-      link.rel = 'stylesheet'; link.setAttribute('data-ftcss','1');
-      link.href = './familytree.css';
+      link.rel = 'stylesheet';
+      link.setAttribute('data-ftcss', '1');
+      link.href = './familytree.css'; // положи рядом с index.html
       document.head.appendChild(link);
     }
+    // JS
     if (!window.FamilyTree) {
       const script = document.createElement('script');
-      script.async = false; script.src = './familytree.js';
-      await new Promise((res, rej) => { script.onload=res; script.onerror=()=>rej(new Error('familytree.js not loaded')); document.head.appendChild(script); });
+      script.async = false;
+      script.src = './familytree.js'; // положи рядом с index.html
+      await new Promise((res, rej) => { script.onload = res; script.onerror = () => rej(new Error('familytree.js not loaded')); document.head.appendChild(script); });
     }
-// Простой шаблон (если свой не подключен)
-if (!FamilyTree.templates.tommy) {
-  const base = FamilyTree.templates.base;
-  FamilyTree.templates.tommy = Object.assign({}, base);
 
-  // ВАЖНО: задаём явный размер карточки
-  FamilyTree.templates.tommy.size = [240, 100];
-
-  FamilyTree.templates.tommy.field_0 =
-    `<text ${FamilyTree.attr.width}="220" style="font-size:16px;font-weight:600" fill="#ffffff" x="12" y="84" text-anchor="start">{val}</text>`;
-  FamilyTree.templates.tommy.field_1 =
-    `<text ${FamilyTree.attr.width}="200" style="font-size:12px;opacity:.9" fill="#ffffff" x="12" y="64" text-anchor="start">{val}</text>`;
-
-  FamilyTree.templates.tommy.node =
-    `<rect x="0" y="0" height="{h}" width="{w}" stroke-width="1" fill="#039BE5" stroke="#0288D1" rx="8" ry="8"></rect>`;
-}
-
+    // Шаблон на случай, если свой не подключен
+    if (!FamilyTree.templates.tommy) {
+      const base = FamilyTree.templates.base;
+      FamilyTree.templates.tommy = Object.assign({}, base);
+      // обязательно задаём размер, иначе ноды «невидимые»
+      FamilyTree.templates.tommy.size = [240, 100];
+      FamilyTree.templates.tommy.field_0 =
+        `<text ${FamilyTree.attr.width}="220" style="font-size:16px;font-weight:600" fill="#ffffff" x="12" y="84" text-anchor="start">{val}</text>`;
+      FamilyTree.templates.tommy.field_1 =
+        `<text ${FamilyTree.attr.width}="200" style="font-size:12px;opacity:.9" fill="#ffffff" x="12" y="64" text-anchor="start">{val}</text>`;
+      FamilyTree.templates.tommy.node =
+        `<rect x="0" y="0" height="{h}" width="{w}" stroke-width="1" fill="#6b7280" stroke="#6b7280" rx="8" ry="8"></rect>`;
+    }
   }
 
   function renderFamilyTree() {
-const container = document.getElementById('treeContainer');
-const data = buildBalkanData(DB); // { nodes, rootNum, ... }
+    const container = document.getElementById('treeContainer');
+    const data = buildBalkanData(DB); // { nodes, num2id, rootNum }
 
-if (!data.nodes.length) {
-  container.innerHTML = `<div class="card" style="margin:12px">Нет данных для отображения</div>`;
-  return;
-}
-
-if (!family) {
-  // отдаём узлы сразу в конструктор
-  family = new window.FamilyTree(container, {
-    template: 'tommy',
-    mouseScrool: window.FamilyTree.action.zoom,
-    enableSearch: true,
-    nodeBinding: { field_0: 'name', field_1: 'subtitle' },
-    roots: data.rootNum ? [data.rootNum] : undefined,
-    siblingSeparation: 80,
-    levelSeparation: 70,
-    subtreeSeparation: 100,
-    nodes: data.nodes,                       // ⬅️ здесь узлы идут сразу
-    nodeMouseClick: (args) => {
-      if (args && args.node) openProfile(data.num2id.get(args.node.id));
+    if (!data.nodes.length) {
+      container.innerHTML = `<div class="card" style="margin:12px">Нет данных для отображения</div>`;
+      return;
     }
-  });
-} else {
-  family.load(data.nodes);                   // последующие обновления
-}
 
+    // первый запуск — узлы сразу в конструктор
+    if (!family) {
+      family = new window.FamilyTree(container, {
+        template: 'tommy',
+        nodeBinding: { field_0: 'name', field_1: 'subtitle' },
 
-  // === Адаптер: строки -> числа ===
+        // управление/зум (безопасно для iOS)
+        mouseScrool: window.FamilyTree.action.zoom,  // именно "Scrool" — так в либе
+        minZoom: 0.5,
+        maxZoom: 2,
+        scaleInitial: window.innerWidth < 768 ? 0.8 : 1,
+
+        // отступы
+        siblingSeparation: 80,
+        levelSeparation: 70,
+        subtreeSeparation: 100,
+
+        roots: data.rootNum ? [data.rootNum] : undefined,
+        nodes: data.nodes,
+
+        nodeMouseClick: (args) => {
+          if (args && args.node) openProfile(data.num2id.get(args.node.id));
+        }
+      });
+    } else {
+      family.load(data.nodes);
+    }
+  }
+
+  // ---- Адаптер: наши строки id -> числовые id; главное исправление: fid/mid ----
   function buildBalkanData(DB) {
-    // 1) маппинг
     const id2num = new Map();
     const num2id = new Map();
     let seq = 1;
+
     for (const u of DB.users) {
       if (!id2num.has(u.id)) { id2num.set(u.id, seq); num2id.set(seq, u.id); seq++; }
     }
-    // Подстрахуемся по рёбрам (вдруг есть id, которых нет в users)
     for (const r of DB.rels) {
       if (!id2num.has(r.a)) { id2num.set(r.a, seq); num2id.set(seq, r.a); seq++; }
       if (!id2num.has(r.b)) { id2num.set(r.b, seq); num2id.set(seq, r.b); seq++; }
     }
 
-    // 2) индексы parent/partner
-    const parentsByChild = new Map(); // numChild -> [numParent...]
+    const parentsByChild = new Map(); // num(child) -> [num(parent)...]
     const partners = new Map();       // num -> Set(numPartner)
+
     for (const r of DB.rels) {
       const a = id2num.get(r.a), b = id2num.get(r.b);
       if (r.type === 'parent') {
@@ -110,24 +124,23 @@ if (!family) {
       }
     }
 
-    // 3) ноды Balkan
     const nodes = DB.users.map(u => {
       const num = id2num.get(u.id);
       const ps = parentsByChild.get(num) || [];
-      const pid = ps[0]; const mid = ps[1];
+      const fid = ps[0];     // father   (ключ ДОЛЖЕН быть fid)
+      const mid = ps[1];     // mother   (ключ ДОЛЖЕН быть mid)
       const pids = partners.has(num) ? Array.from(partners.get(num)) : undefined;
+
       const subtitle = [u.dob ? fmt(u.dob) : '', u.dod ? `– ${fmt(u.dod)}` : ''].join(' ').trim();
       const n = { id: num, name: u.name, subtitle };
-      if (pid) n.pid = pid;
-      if (mid) n.mid = mid;
+      if (fid) n.fid = fid;           // <-- ИСПРАВЛЕНИЕ
+      if (mid) n.mid = mid;           //     ИСПРАВЛЕНИЕ
       if (pids && pids.length) n.pids = pids;
       return n;
     });
 
-    // корень = текущий пользователь
     const rootNum = id2num.get(DB.currentUserId);
-
-    return { nodes, id2num, num2id, rootNum };
+    return { nodes, num2id, rootNum };
   }
 
   function fmt(iso) { if (!iso) return ''; const [y,m,d]=iso.split('-'); return `${d}.${m}.${y}`; }
@@ -313,7 +326,10 @@ if (!family) {
 
   function findExisting(name, dob){
     const n = name.toLowerCase().replace(/\s+/g,' ').trim();
-    return DB.users.find(u => u.name.toLowerCase().replace(/\s+/g,' ').trim() === n && (u.dob||'') === (dob||''));
+    return DB.users.find(u =>
+      u.name.toLowerCase().replace(/\s+/g,' ').trim() === n &&
+      (u.dob||'') === (dob||'')
+    );
   }
   function autoMergeDuplicates(){
     const key = u => (u.name||'').toLowerCase().replace(/\s+/g,' ').trim() + '|' + (u.dob||'');
