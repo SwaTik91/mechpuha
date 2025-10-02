@@ -12,9 +12,9 @@ window.Tree = (function () {
 
     const v = UI.view();
     v.innerHTML = `
-      <div id="treeContainer"
-           style="width:100%;height:72vh;background:#fff;border-radius:12px;border:1px solid #e5e7eb;
-                  position:relative;overflow:hidden;touch-action:pan-y;">
+    <div id="treeContainer"
+           style="width:100%;height:76vh;background:#fff;border-radius:12px;border:1px solid #e5e7eb;
+                  position:relative;overflow:hidden;touch-action:pan-x pan-y;"
       </div>`;
 
     if (!isBalkanReady) {
@@ -216,6 +216,9 @@ function buildBalkanData(DB) {
     ].join(' ').trim();
 
     const n = { id, name: u.name, subtitle };
+    const [nameTop, nameBottom] = splitName(u.name);
+    const relation = kinLabel(DB, num2id, id2num, u.id, DB.currentUserId);
+    const n = { id, nameTop, nameBottom, subtitle, relation };
     if (fid) n.fid = fid;
     if (mid) n.mid = mid;
     if (explicitPids && explicitPids.length) n.pids = explicitPids;
@@ -240,6 +243,49 @@ function buildBalkanData(DB) {
   return { nodes, num2id, rootNum };
 }
 
+ /* ——— helpers ——— */
+function splitName(full) {
+  if (!full) return ['', ''];
+  const parts = full.trim().split(/\s+/);
+  if (parts.length <= 2) return [full, ''];               // ФИ/ФИО без разрыва
+  // Фамилия + Имя на 1 строку, отчество на 2 строку
+  return [`${parts[0]} ${parts[1]}`, parts.slice(2).join(' ')];
+}
+
+function kinLabel(DB, num2id, id2num, uid, meId) {
+  if (!uid || !meId) return '';
+  if (uid === meId) return 'я';
+  const rels = DB.rels || [];
+  const isSpouse  = rels.some(r => r.type==='spouse' && ((r.a===uid && r.b===meId) || (r.b===uid && r.a===meId)));
+  if (isSpouse) return 'супруг(а)';
+  const isParent  = rels.some(r => r.type==='parent' && r.a===uid && r.b===meId);
+  if (isParent) return 'мама/папа';
+  const isChild   = rels.some(r => r.type==='parent' && r.a===meId && r.b===uid) ||
+                    rels.some(r => r.type==='child'  && r.a===meId && r.b===uid);
+  if (isChild) return 'сын/дочь';
+  const isSibling = rels.some(r => r.type==='sibling' && ((r.a===uid && r.b===meId) || (r.b===uid && r.a===meId)));
+  if (isSibling) return 'брат/сестра';
+  // дед/бабушка
+  const parentsOfMe = rels.filter(r=>r.type==='parent'&&r.b===meId).map(r=>r.a);
+  const gps = parentsOfMe.flatMap(p=> rels.filter(r=>r.type==='parent'&&r.b===p).map(r=>r.a));
+  if (gps.includes(uid)) return 'дед/бабушка';
+  // внук/внучка
+  const childrenOfMe = rels.filter(r=>r.type==='parent'&&r.a===meId).map(r=>r.b);
+  const gc = childrenOfMe.flatMap(c=> rels.filter(r=>r.type==='parent'&&r.a===c).map(r=>r.b));
+  if (gc.includes(uid)) return 'внук/внучка';
+  // дядя/тётя
+  const siblingsOfParents = parentsOfMe.flatMap(p=>[
+    ...rels.filter(r=>r.type==='sibling'&&r.a===p).map(r=>r.b),
+    ...rels.filter(r=>r.type==='sibling'&&r.b===p).map(r=>r.a),
+  ]);
+  if (siblingsOfParents.includes(uid)) return 'дядя/тётя';
+  // двоюродный(ая)
+  const cousins = siblingsOfParents.flatMap(auntUncle =>
+    rels.filter(r=>r.type==='parent'&&r.a===auntUncle).map(r=>r.b)
+  );
+  if (cousins.includes(uid)) return 'двоюродный(ая)';
+  return '';
+}
 
 
 
