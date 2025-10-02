@@ -46,63 +46,61 @@ window.Tree = (function () {
     }
 
     // Красивый шаблон "shalom"
-  // Красивый шаблон "shalom" (фикс. размер, перенос строк)
+// Красивый шаблон "shalom"
 if (!FamilyTree.templates.shalom) {
   const base = FamilyTree.templates.base;
   FamilyTree.templates.shalom = Object.assign({}, base);
 
-  // Карточка стала чуть шире и выше, чтобы всё влезало
   FamilyTree.templates.shalom.size = [340, 164];
 
-  // Тень
   FamilyTree.templates.shalom.defs = `
     <filter id="ftShadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity=".12"/>
     </filter>
   `;
 
-  // Фон карточки
+  // фон
   FamilyTree.templates.shalom.node =
     `<rect x="0" y="0" rx="16" ry="16" width="{w}" height="{h}"
            fill="#ffffff" stroke="#e5e7eb" filter="url(#ftShadow)"></rect>`;
 
-  // field_1: даты/город — первая строка, серым
+  // даты/город
   FamilyTree.templates.shalom.field_1 =
     `<text ${FamilyTree.attr.width}="300" ${FamilyTree.attr.wrap}="true"
            x="18" y="42"
            style="font-size:12px;fill:#6b7280" text-anchor="start">{val}</text>`;
 
-  // field_0: Фамилия Имя — крупно, перенос по словам
+  // фамилия + имя
   FamilyTree.templates.shalom.field_0 =
     `<text ${FamilyTree.attr.width}="300" ${FamilyTree.attr.wrap}="true"
            x="18" y="66"
            style="font-size:18px;font-weight:700;fill:#111827;line-height:1.15"
            text-anchor="start">{val}</text>`;
 
-  // field_2: Отчество (или «вторая строка имени») — мелко, перенос по словам
+  // отчество
   FamilyTree.templates.shalom.field_2 =
     `<text ${FamilyTree.attr.width}="300" ${FamilyTree.attr.wrap}="true"
            x="18" y="92"
            style="font-size:13px;fill:#374151;line-height:1.1"
            text-anchor="start">{val}</text>`;
 
-  // field_3: бейдж родства
+  // бейдж родства (под отчество, внизу слева)
   FamilyTree.templates.shalom.field_3 =
-    `<rect x="{w-78}" y="14" rx="10" ry="10" width="62" height="22"
-           fill="#f3f4f6" stroke="#e5e7eb"></rect>
-     <text x="{w-47}" y="30"
-           style="font-size:11px;fill:#111827" text-anchor="middle">{val}</text>`;
+    `<text ${FamilyTree.attr.width}="300" ${FamilyTree.attr.wrap}="true"
+           x="18" y="118"
+           style="font-size:12px;font-weight:600;fill:#2563eb"
+           text-anchor="start">{val}</text>`;
 
-  // Линии связей — более заметные
+  // линии
   FamilyTree.templates.shalom.link =
     `<path stroke="#9ca3af" stroke-width="2" fill="none"></path>`;
   FamilyTree.templates.shalom.partnerConnector = { stroke: "#9ca3af", "stroke-width": 2 };
 
-  // Плюсик (на будущее)
   FamilyTree.templates.shalom.plus =
     `<circle cx="15" cy="15" r="15" fill="#ff7a00"></circle>
      <text x="15" y="20" fill="#fff" text-anchor="middle" font-size="20">+</text>`;
 }
+
 
   }
 
