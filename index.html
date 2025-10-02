@@ -36,7 +36,14 @@
     <div id="sheet-content"></div>
   </div>
   <div id="backdrop" class="backdrop hidden"></div>
-
+<script src="./assets/js/db.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js"></script>
+<script>
+  window.supabase = supabase.createClient(
+    "https://ytgfcsruvhzheeguvwoy.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0Z2Zjc3J1dmh6aGVlZ3V2d295Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkzNjg1NzUsImV4cCI6MjA3NDk0NDU3NX0.Gc4T_wLhpvBRpZB6l50SilrXhsXPdZw1c4ZBGkeXMl4"
+  );
+</script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/ui.js"></script>
   <script src="assets/js/feed.js"></script>
@@ -47,13 +54,8 @@
   <script src="assets/js/admin.js"></script>
   <script src="assets/js/profile.js"></script>
   <script src="assets/js/app.js"></script>
-  <script src="https://unpkg.com/@supabase/supabase-js"></script>
-<script>
-  window.supabase = supabase.createClient(
-    "https://ytgfcsruvhzheeguvwoy.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0Z2Zjc3J1dmh6aGVlZ3V2d295Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkzNjg1NzUsImV4cCI6MjA3NDk0NDU3NX0.Gc4T_wLhpvBRpZB6l50SilrXhsXPdZw1c4ZBGkeXMl4"
-  );
-</script>
+  <!-- Подключаешь supabase-js в index.html ДО db.js -->
+
 
 </body>
 </html>
