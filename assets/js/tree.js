@@ -114,7 +114,7 @@ if (!FamilyTree.templates.shalom) {
 
   }
 
-function renderFamilyTree() {
+async function renderFamilyTree() {
   const container = document.getElementById('treeContainer');
   const data = buildBalkanData(DB); // { nodes, num2id, rootNum, roots }
 
@@ -489,7 +489,9 @@ async function _saveAdd(contextId) {
 
     // 3) обновить локальные данные из облака и перерисовать
     if (window.DBAPI?.reloadIntoWindowDB) {
-      await DBAPI.reloadIntoWindowDB();
+       (async () => {
+  await DBAPI.reloadIntoWindowDB();
+   })();
     }
     UI.close();
     renderFamilyTree();
