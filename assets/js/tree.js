@@ -438,31 +438,6 @@ function kinLabel(DB, num2id, id2num, uid, meId) {
     const box = document.getElementById('rel_suggest'); box.classList.add('hidden'); box.innerHTML='';
   }
 
-  function _saveAdd(contextId) {
-    const me = contextId || DB.currentUserId;
-    const type = document.getElementById('rel_type').value;
-
-    let user = selectedUser;
-    if (!user) {
-      const name = (document.getElementById('rel_name').value||'').trim();
-      const dob  = (document.getElementById('rel_dob').value||'').trim();
-      const city = (document.getElementById('rel_city').value||'').trim();
-      if (!name) { alert('Введите ФИО или выберите из списка.'); return; }
-      const existing = findExisting(name, dob);
-      user = existing && confirm(`Найден ${existing.name}${existing.dob?` • ${existing.dob}`:''}. Связать?`)
-        ? existing
-        : ({ id: 'u'+(DB.users.length+1), name, dob, city });
-      if (!existing) DB.users.push(user);
-    }
-
- // сначала создадим пользователя в БД, если он новый (у нового нет UUID)
- if (!user.id || user.id.startsWith('u')) {
-   const created = await DBAPI.addUser({ name: user.name, dob: user.dob, city: user.city });
-   user.id = created.id;
-   // синхронизируем локальный массив
-   window.DB.users.push(created);
- }
- // добавим связь
 // ЗАМЕНИ ЭТУ ФУНКЦИЮ ЦЕЛИКОМ
 async function _saveAdd(contextId) {
   const me = contextId || DB.currentUserId;
