@@ -110,65 +110,104 @@ setTimeout(() => {
 
 /* ----- Адаптер: строки -> числа, связи -> fid/mid/pids (минимально и устойчиво) ----- */
 function buildBalkanData(DB) {
-  // 1) строки id -> числа
-  const id2num = new Map(), num2id = new Map(); let seq = 1;
-  for (const u of DB.users) { if (!id2num.has(u.id)) { id2num.set(u.id, seq); num2id.set(seq, u.id); seq++; } }
-  for (const r of DB.rels) {
+  // 1) Маппинг строковых id -> числовых id (требование FamilyTreeJS)
+  const id2num = new Map(), num2id = new Map();
+  let seq = 1;
+  for (const u of DB.users) {
+    if (!id2num.has(u.id)) { id2num.set(u.id, seq); num2id.set(seq, u.id); seq++; }
+  }
+  // учтем id из rels, если там есть "временные" узлы без записи в users
+  for (const r of (DB.rels || [])) {
     if (!id2num.has(r.a)) { id2num.set(r.a, seq); num2id.set(seq, r.a); seq++; }
     if (!id2num.has(r.b)) { id2num.set(r.b, seq); num2id.set(seq, r.b); seq++; }
   }
 
-  // 2) индексы
+  // 2) Индексы связей
   const parentsByChild = new Map();   // num(child) -> Set(num(parent))
-  const partners = new Map();         // num -> Set(numPartner)
-  const siblings = [];                // [ [a,b], ... ]
-  const setAdd = (m, k, v) => { if (!m.has(k)) m.set(k, new Set()); m.get(k).add(v); };
+  const partners       = new Map();   // явные супруги из rels: num -> Set(numPartner)
+  const siblings       = [];          // пары братьев/сестер для наследования родителей
 
-  for (const r of DB.rels) {
-    const a = id2num.get(r.a), b = id2num.get(r.b);
-    if (r.type === 'parent') setAdd(parentsByChild, b, a);
-    else if (r.type === 'child') setAdd(parentsByChild, b, a);         // трактуем как parent->child
-    else if (r.type === 'spouse') {
+  const setAdd = (map, key, val) => {
+    if (!map.has(key)) map.set(key, new Set());
+    map.get(key).add(val);
+  };
+
+  for (const r of (DB.rels || [])) {
+    const a = id2num.get(r.a);
+    const b = id2num.get(r.b);
+    if (!a || !b) continue;
+
+    if (r.type === 'parent') {
+      // a — родитель b
+      setAdd(parentsByChild, b, a);
+    } else if (r.type === 'child') {
+      // a — родитель b (инверсная запись)
+      setAdd(parentsByChild, b, a);
+    } else if (r.type === 'spouse') {
       if (!partners.has(a)) partners.set(a, new Set());
       if (!partners.has(b)) partners.set(b, new Set());
-      partners.get(a).add(b); partners.get(b).add(a);
-    } else if (r.type === 'sibling') siblings.push([a, b]);
+      partners.get(a).add(b);
+      partners.get(b).add(a);
+    } else if (r.type === 'sibling') {
+      siblings.push([a, b]);
+    }
   }
 
-  // 3) если у брата/сестры нет родителей — наследуем от другого
+  // 3) Если у брата/сестры нет родителей — наследуем от другого
   for (const [a, b] of siblings) {
-    const pa = parentsByChild.get(a), pb = parentsByChild.get(b);
+    const pa = parentsByChild.get(a);
+    const pb = parentsByChild.get(b);
     if (pa && (!pb || pb.size === 0)) parentsByChild.set(b, new Set(pa));
     if (pb && (!pa || pa.size === 0)) parentsByChild.set(a, new Set(pb));
   }
 
-  // 4) если у ребёнка один родитель и у него ровно один супруг — добавим ко-родителя
+  // 4) Если у ребенка один родитель и у него ровно один супруг — добавим ко-родителя
   for (const [child, set] of parentsByChild.entries()) {
     if (set.size === 1) {
       const [p] = Array.from(set);
       const ps = partners.get(p);
-      if (ps && ps.size === 1) { const [co] = Array.from(ps); if (co !== p) set.add(co); }
+      if (ps && ps.size === 1) {
+        const [co] = Array.from(ps);
+        if (co !== p) set.add(co);
+      }
     }
   }
 
-  // 5) максимум два родителя; если >2 — предпочесть супружескую пару, иначе первые два по возрастанию
+  // 5) Выбор максимум двух родителей; если >2 — предпочесть супружескую пару, иначе первые два по возрастанию
   const chooseParents = (child) => {
     const s = parentsByChild.get(child);
     if (!s) return [];
     if (s.size <= 2) return Array.from(s);
     const arr = Array.from(s);
-    for (let i = 0; i < arr.length; i++)
-      for (let j = i + 1; j < arr.length; j++)
-        if (partners.has(arr[i]) && partners.get(arr[i]).has(arr[j])) return [arr[i], arr[j]];
+    // попробуем найти супружескую пару среди множества родителей
+    for (let i = 0; i < arr.length; i++) {
+      for (let j = i + 1; j < arr.length; j++) {
+        const A = arr[i], B = arr[j];
+        if (partners.has(A) && partners.get(A).has(B)) return [A, B];
+      }
+    }
+    // иначе просто первые два по возрастанию id
     return arr.sort((x, y) => x - y).slice(0, 2);
   };
 
-  // 6) собрать ноды (ВАЖНО: fid/mid)
+  // 6) Собираем узлы + копим "виртуальные супруги" (родители общего ребенка)
+  const inferredPartners = new Map(); // num -> Set(num) (добавим только в визуализацию)
   const nodes = DB.users.map(u => {
     const id = id2num.get(u.id);
     const ps = chooseParents(id).sort((a, b) => a - b);
     const fid = ps[0], mid = ps[1];
-    const pids = partners.has(id) ? Array.from(partners.get(id)).sort((a, b) => a - b) : undefined;
+
+    // если у узла два родителя — считаем их "парой" для отрисовки, даже если нет явного spouse в rels
+    if (fid && mid) {
+      if (!inferredPartners.has(fid)) inferredPartners.set(fid, new Set());
+      if (!inferredPartners.has(mid)) inferredPartners.set(mid, new Set());
+      inferredPartners.get(fid).add(mid);
+      inferredPartners.get(mid).add(fid);
+    }
+
+    const explicitPids = partners.has(id)
+      ? Array.from(partners.get(id)).sort((a, b) => a - b)
+      : undefined;
 
     const subtitle = [
       u.dob ? fmt(u.dob) : '',
@@ -179,13 +218,28 @@ function buildBalkanData(DB) {
     const n = { id, name: u.name, subtitle };
     if (fid) n.fid = fid;
     if (mid) n.mid = mid;
-    if (pids && pids.length) n.pids = pids;
+    if (explicitPids && explicitPids.length) n.pids = explicitPids;
     return n;
   });
 
+  // 7) Применяем инференс супругов: добавим виртуальные pids там, где явных spouse нет
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  for (const [a, setB] of inferredPartners.entries()) {
+    const nodeA = byId.get(a);
+    if (!nodeA) continue;
+    const explicit = partners.has(a) ? partners.get(a) : new Set();
+    const aPids = new Set(nodeA.pids || []);
+    for (const b of setB) {
+      if (!explicit.has(b)) aPids.add(b);
+    }
+    nodeA.pids = Array.from(aPids).sort((x, y) => x - y);
+  }
+
+  // 8) Возврат
   const rootNum = id2num.get(DB.currentUserId);
   return { nodes, num2id, rootNum };
 }
+
 
 
 
