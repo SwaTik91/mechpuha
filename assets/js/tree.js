@@ -455,23 +455,115 @@ function kinLabel(DB, num2id, id2num, uid, meId) {
       if (!existing) DB.users.push(user);
     }
 
-    linkByRelation(me, user.id, type);
+ // сначала создадим пользователя в БД, если он новый (у нового нет UUID)
+ if (!user.id || user.id.startsWith('u')) {
+   const created = await DBAPI.addUser({ name: user.name, dob: user.dob, city: user.city });
+   user.id = created.id;
+   // синхронизируем локальный массив
+   window.DB.users.push(created);
+ }
+ // добавим связь
+// ЗАМЕНИ ЭТУ ФУНКЦИЮ ЦЕЛИКОМ
+async function _saveAdd(contextId) {
+  const me = contextId || DB.currentUserId;
+  const type = (document.getElementById('rel_type') || {}).value;
 
-    if (type==='auntuncle') {
-      const sideParent = (document.getElementById('rel_side_parent')||{}).value || getDefaultParent(me);
-      if (!sideParent) { alert('Сначала добавьте родителей.'); return; }
-      DB.rels.push({ type:'sibling', a:sideParent, b:user.id });
-      DB.rels.push({ type:'sibling', a:user.id,     b:sideParent });
-    }
-    if (type==='cousin') {
-      const auntId = (document.getElementById('rel_aunt')||{}).value;
-      if (!auntId) { alert('Выберите дядю/тётю'); return; }
-      DB.rels.push({ type:'child', a:auntId, b:user.id });
+  try {
+    // 1) определить пользователя: выбран из подсказки или создаём нового
+    let user = selectedUser;
+    if (!user) {
+      const name = (document.getElementById('rel_name').value || '').trim();
+      const dob  = (document.getElementById('rel_dob').value || '').trim();
+      const city = (document.getElementById('rel_city').value || '').trim();
+      if (!name) { alert('Введите ФИО или выберите из списка.'); return; }
+
+      // попытаемся найти точное совпадение в Supabase (ФИО + дата)
+      let existing = null;
+      if (window.DBAPI?.findUserExact) {
+        try { existing = await DBAPI.findUserExact(name, dob || null); } catch(e) {}
+      }
+
+      if (existing) {
+        user = existing; // нашли в облаке
+      } else {
+        // создаём нового пользователя в Supabase
+        if (!window.DBAPI?.addUser) { alert('База не инициализирована. Проверь подключение Supabase.'); return; }
+        const created = await DBAPI.addUser({ name, dob: dob || null, city: city || null });
+        user = created;
+        // в локальной копии тоже обновим
+        DB.users.push(created);
+      }
+    } else {
+      // если выбран локальный (временный) пользователь вида "u7" — создадим запись в облаке
+      if (user.id && /^u\d+$/.test(user.id)) {
+        if (!window.DBAPI?.addUser) { alert('База не инициализирована. Проверь подключение Supabase.'); return; }
+        const created = await DBAPI.addUser({ name: user.name, dob: user.dob || null, city: user.city || null });
+        // заменим id на UUID
+        const oldId = user.id;
+        user.id = created.id;
+        // Подчистим локальные связи на старый id (если вдруг были)
+        DB.rels.forEach(r => { if (r.a === oldId) r.a = user.id; if (r.b === oldId) r.b = user.id; });
+        // и в локальных users заменим
+        const idx = DB.users.findIndex(x => x.id === oldId);
+        if (idx >= 0) DB.users[idx] = created;
+      }
     }
 
+    // 2) добавить связь в Supabase (включая специальные типы "auntuncle" и "cousin")
+    await addRelationSupa(me, user.id, type);
+
+    // 3) обновить локальные данные из облака и перерисовать
+    if (window.DBAPI?.reloadIntoWindowDB) {
+      await DBAPI.reloadIntoWindowDB();
+    }
     UI.close();
     renderFamilyTree();
+
+    // 4) (приятный UX) центрируемся на добавленном
+    try {
+      const data = buildBalkanData(DB);
+      const num = [...data.num2id.entries()].find(([, v]) => v === user.id)?.[0];
+      if (num && typeof family?.center === 'function') {
+        setTimeout(() => { family.center(num); family.select(num); }, 80);
+      }
+    } catch (e) {}
+  } catch (err) {
+    console.error(err);
+    alert('Не удалось сохранить в базу. Проверь подключение Supabase и права (RLS).');
   }
+}
+
+    // ДОБАВЬ ЭТУ ФУНКЦИЮ (рядом с linkByRelation)
+async function addRelationSupa(me, otherId, type) {
+  if (!window.DBAPI?.addRel) throw new Error('DBAPI.addRel не найден (Supabase не инициализирован).');
+
+  if (type === 'parent') {
+    await DBAPI.addRel({ type: 'parent', a: otherId, b: me });
+  } else if (type === 'child') {
+    // в таблице храним родителя в поле a, ребёнка в b
+    await DBAPI.addRel({ type: 'parent', a: me, b: otherId });
+  } else if (type === 'spouse') {
+    await DBAPI.addRel({ type: 'spouse', a: me, b: otherId });
+    await DBAPI.addRel({ type: 'spouse', a: otherId, b: me });
+  } else if (type === 'sibling') {
+    await DBAPI.addRel({ type: 'sibling', a: me, b: otherId });
+    await DBAPI.addRel({ type: 'sibling', a: otherId, b: me });
+  } else if (type === 'auntuncle') {
+    // нужно знать "через какого родителя" — берём из выпадашки
+    const sideParent = (document.getElementById('rel_side_parent') || {}).value || getDefaultParent(me);
+    if (!sideParent) { alert('Сначала добавьте родителей.'); return; }
+    await DBAPI.addRel({ type: 'sibling', a: sideParent, b: otherId });
+    await DBAPI.addRel({ type: 'sibling', a: otherId,   b: sideParent });
+  } else if (type === 'cousin') {
+    // двоюродный = ребёнок моего дяди/тёти
+    const auntId = (document.getElementById('rel_aunt') || {}).value;
+    if (!auntId) { alert('Выберите дядю/тётю'); return; }
+    await DBAPI.addRel({ type: 'parent', a: auntId, b: otherId });
+  } else {
+    console.warn('Неизвестный тип связи:', type);
+  }
+}
+
 
   function linkByRelation(me, otherId, type) {
     if (type==='parent')      DB.rels.push({ type:'parent', a:otherId, b:me });
