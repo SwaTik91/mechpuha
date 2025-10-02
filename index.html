@@ -4,17 +4,50 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>MishpuchaTech</title>
+
+  <!-- iOS PWA -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Mishpucha">
+  <meta name="theme-color" content="#f6efe9" />
+
+  <!-- PWA -->
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
-  <meta name="theme-color" content="#f6efe9" />
-  <!-- cache-busting для CSS -->
+
+  <!-- Styles -->
   <link rel="stylesheet" href="assets/css/style.css?v=20251001">
   <link href="familytree.css" rel="stylesheet" />
-  <script src="familytree.js"></script>
 
+  <!-- Balkan FamilyTreeJS (должен быть ДО tree.js) -->
+  <script defer src="familytree.js"></script>
+
+  <!-- Supabase SDK (должен быть ДО db.js) -->
+  <script defer src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script>
+    // ВСТАВЬ свои значения проекта Supabase:
+    window.__SUPA_URL__  = "https://ytgfcsruvhzheeguvwoy.supabase.co";
+    window.__SUPA_ANON__ = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0Z2Zjc3J1dmh6aGVlZ3V2d295Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkzNjg1NzUsImV4cCI6MjA3NDk0NDU3NX0.Gc4T_wLhpvBRpZB6l50SilrXhsXPdZw1c4ZBGkeXMl4";
+  </script>
+
+  <!-- Твой модуль работы с БД (использует window.supabase из SDK выше) -->
+  <script defer src="./assets/js/db.js"></script>
+
+  <!-- Базовые данные и UI -->
+  <script defer src="assets/js/data.js"></script>
+  <script defer src="assets/js/ui.js"></script>
+
+  <!-- Фичи приложения -->
+  <script defer src="assets/js/feed.js"></script>
+  <script defer src="assets/js/tree.js"></script>
+  <script defer src="assets/js/calendar.js"></script>
+  <script defer src="assets/js/groups.js"></script>
+  <script defer src="assets/js/events.js"></script>
+  <script defer src="assets/js/admin.js"></script>
+  <script defer src="assets/js/profile.js"></script>
+
+  <!-- Точка входа (последним) -->
+  <script defer src="assets/js/app.js"></script>
 </head>
 <body>
   <div id="app">
@@ -22,40 +55,22 @@
       <div id="title">MishpuchaTech</div>
       <div id="header-action"></div>
     </header>
+
     <main id="view" class="view"></main>
+
     <nav class="tabbar">
-      <button data-tab="feed" class="tab active"><img src="assets/icons/feed.svg"><span>Лента</span></button>
-      <button data-tab="tree" class="tab"><img src="assets/icons/tree.svg"><span>Древо</span></button>
-      <button data-tab="calendar" class="tab"><img src="assets/icons/calendar.svg"><span>Календарь</span></button>
-      <button data-tab="groups" class="tab"><img src="assets/icons/chat.svg"><span>Группы</span></button>
-      <button data-tab="profile" class="tab"><img src="assets/icons/profile.svg"><span>Профиль</span></button>
+      <button data-tab="feed" class="tab active"><img src="assets/icons/feed.svg" alt=""><span>Лента</span></button>
+      <button data-tab="tree" class="tab"><img src="assets/icons/tree.svg" alt=""><span>Древо</span></button>
+      <button data-tab="calendar" class="tab"><img src="assets/icons/calendar.svg" alt=""><span>Календарь</span></button>
+      <button data-tab="groups" class="tab"><img src="assets/icons/chat.svg" alt=""><span>Группы</span></button>
+      <button data-tab="profile" class="tab"><img src="assets/icons/profile.svg" alt=""><span>Профиль</span></button>
     </nav>
   </div>
+
   <div id="sheet" class="sheet hidden">
     <div class="sheet-handle"></div>
     <div id="sheet-content"></div>
   </div>
   <div id="backdrop" class="backdrop hidden"></div>
-<script src="./assets/js/db.js"></script>
-<script src="https://unpkg.com/@supabase/supabase-js"></script>
-<script>
-  window.supabase = supabase.createClient(
-    "https://ytgfcsruvhzheeguvwoy.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0Z2Zjc3J1dmh6aGVlZ3V2d295Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkzNjg1NzUsImV4cCI6MjA3NDk0NDU3NX0.Gc4T_wLhpvBRpZB6l50SilrXhsXPdZw1c4ZBGkeXMl4"
-  );
-</script>
-  <script src="assets/js/data.js"></script>
-  <script src="assets/js/ui.js"></script>
-  <script src="assets/js/feed.js"></script>
-  <script src="assets/js/tree.js"></script>
-  <script src="assets/js/calendar.js"></script>
-  <script src="assets/js/groups.js"></script>
-  <script src="assets/js/events.js"></script>
-  <script src="assets/js/admin.js"></script>
-  <script src="assets/js/profile.js"></script>
-  <script src="assets/js/app.js"></script>
-  <!-- Подключаешь supabase-js в index.html ДО db.js -->
-
-
 </body>
 </html>
