@@ -49,24 +49,35 @@ window.Tree = (function () {
     if (!FamilyTree.templates.shalom) {
       const base = FamilyTree.templates.base;
       FamilyTree.templates.shalom = Object.assign({}, base);
-      FamilyTree.templates.shalom.size = [280, 120];
+      FamilyTree.templates.shalom.size = [320, 128];
       FamilyTree.templates.shalom.defs = `
         <filter id="ftShadow" x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity=".12"/>
         </filter>
       `;
-      FamilyTree.templates.shalom.node =
-        `<rect x="0" y="0" rx="14" ry="14" width="{w}" height="{h}"
-               fill="#ffffff" stroke="#e6e6e6" filter="url(#ftShadow)"></rect>`;
+ FamilyTree.templates.shalom.node =
+        `<rect x="0" y="0" rx="16" ry="16" width="{w}" height="{h}"
+               fill="#ffffff" stroke="#e5e7eb" filter="url(#ftShadow)"></rect>`;
+ /* field_0: Фамилия Имя (крупно) */
       FamilyTree.templates.shalom.field_0 =
-        `<text ${FamilyTree.attr.width}="250" x="16" y="76"
-               style="font-size:17px;font-weight:700;fill:#1f2937" text-anchor="start">{val}</text>`;
+        `<text ${FamilyTree.attr.width}="280" x="18" y="70"
+               style="font-size:18px;font-weight:700;fill:#111827" text-anchor="start">{val}</text>`;
+      /* field_2: Отчество или вторая строка имени (мелко) */
+     FamilyTree.templates.shalom.field_2 =
+        `<text ${FamilyTree.attr.width}="280" x="18" y="90"
+               style="font-size:12px;fill:#374151" text-anchor="start">{val}</text>`;
+      /* field_1: даты/город (сереньким) */
       FamilyTree.templates.shalom.field_1 =
-        `<text ${FamilyTree.attr.width}="250" x="16" y="54"
-               style="font-size:12px;fill:#6b7280" text-anchor="start">{val}</text>`;
+        `<text ${FamilyTree.attr.width}="280" x="18" y="50"
+              style="font-size:12px;fill:#6b7280" text-anchor="start">{val}</text>`;
+      /* field_3: бейдж родства */
+      FamilyTree.templates.shalom.field_3 =
+        `<rect x="{w-76}" y="16" rx="10" ry="10" width="60" height="20" fill="#f3f4f6" stroke="#e5e7eb"></rect>
+         <text x="{w-46}" y="30" style="font-size:11px;fill:#111827" text-anchor="middle">{val}</text>`;
+      /* линии связей (сделаем их более заметными) */
       FamilyTree.templates.shalom.link =
-        `<path stroke="#e9a25b" stroke-width="2.5" fill="none"></path>`;
-      FamilyTree.templates.shalom.partnerConnector = { stroke: "#d68d4a", "stroke-width": 2.5 };
+        `<path stroke="#9ca3af" stroke-width="2" fill="none"></path>`;
+      FamilyTree.templates.shalom.partnerConnector = { stroke: "#9ca3af", "stroke-width": 2 };
       FamilyTree.templates.shalom.plus =
         `<circle cx="15" cy="15" r="15" fill="#ff7a00"></circle><text x="15" y="20" fill="#fff" text-anchor="middle" font-size="20">+</text>`;
     }
@@ -82,9 +93,9 @@ function renderFamilyTree() {
   }
 
   if (!family) {
-    family = new window.FamilyTree(container, {
+  family = new window.FamilyTree(container, {
       template: 'shalom',
-      nodeBinding: { field_0: 'name', field_1: 'subtitle' },
+      nodeBinding: { field_0: 'nameTop', field_2: 'nameBottom', field_1: 'subtitle', field_3: 'relation' },
       mouseScrool: window.FamilyTree.action.zoom,
       minZoom: .5, maxZoom: 2, scaleInitial: window.innerWidth < 768 ? 0.8 : 1,
       siblingSeparation: 90, levelSeparation: 80, subtreeSeparation: 110,
