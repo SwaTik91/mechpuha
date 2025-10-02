@@ -58,17 +58,17 @@
   };
 
   // Boot
-  window.addEventListener('load', ()=>{
+   window.addEventListener('load', async ()=>{
     const tabs = document.querySelectorAll('.tabbar .tab');
      // Инициализация Supabase
-   try {
-     await DBAPI.init({ url: window.__SUPA_URL__, anonKey: window.__SUPA_ANON__ });
-     const { users, rels } = await DBAPI.loadAll();
-    window.DB.users = users;
-     window.DB.rels = rels;
-   } catch (e) {
-     console.warn('Supabase init/load failed, falling back to local data', e);
-   }
+try {
+      await DBAPI.init({ url: window.__SUPA_URL__, anonKey: window.__SUPA_ANON__ });
+      const { users, rels } = await DBAPI.loadAll();
+     window.DB.users = users;
+      window.DB.rels = rels;
+    } catch (e) {
+      console.warn('Supabase init/load failed, falling back to local data', e);
+    }
     tabs.forEach(btn=>btn.addEventListener('click', ()=>{
       tabs.forEach(b=>b.classList.remove('active')); btn.classList.add('active'); route(btn.getAttribute('data-tab'));
     }));
