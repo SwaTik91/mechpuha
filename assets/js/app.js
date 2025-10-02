@@ -1,4 +1,3 @@
-
 (function(){
   function showInvite(){
     window.UI.sheet(`
@@ -18,7 +17,7 @@
   }
 
   window.showLogin = function(){
-    const users = window.DB.users;
+    const users = window.DB.users || [];
     const render = (arr)=>{
       return arr.map(u=>`<div class="login-item" onclick="selectUser('${u.id}')">${u.name}${u.dob? ' • '+u.dob : ''}</div>`).join('');
     };
@@ -35,7 +34,7 @@
     `);
     window.filterLogin = function(){
       const q = (document.getElementById('login_q').value||'').toLowerCase();
-      const f = users.filter(u => u.name.toLowerCase().includes(q));
+      const f = (window.DB.users||[]).filter(u => (u.name||'').toLowerCase().includes(q));
       document.getElementById('login_list').innerHTML = render(f);
     };
     window.selectUser = function(id){
@@ -44,34 +43,62 @@
       window.UI.close();
       route('feed');
     };
-    window.createUser = function(){
+    window.createUser = async function(){
       const name = (document.getElementById('new_name').value||'').trim();
       const dob = (document.getElementById('new_dob').value||'').trim();
       if(!name){ alert('Введите ФИО'); return; }
-      const id = 'u'+(window.DB.users.length+1);
-      window.DB.users.push({id, name, dob});
-      localStorage.setItem('mt_user', id);
-      window.DB.currentUserId = id;
-      window.UI.close();
-      route('feed');
+      try {
+        // создаём пользователя в Supabase
+        const created = await DBAPI.addUser({ name, dob: dob || null });
+        // перезагружаем облачные данные в локальную копию
+        const { users, rels } = await DBAPI.loadAll();
+        window.DB.users = users;
+        window.DB.rels  = rels;
+        // запоминаем текущего пользователя
+        localStorage.setItem('mt_user', created.id);
+        window.DB.currentUserId = created.id;
+        window.UI.close();
+        route('feed');
+      } catch (e) {
+        console.error(e);
+        alert('Не удалось создать пользователя в базе. Проверь подключение Supabase и политики RLS.');
+      }
     };
   };
 
+  // утилита ожидания (на случай, если модуль ещё не успел инициализироваться)
+  function waitFor(cond, timeout=5000, interval=30){
+    return new Promise((resolve, reject)=>{
+      const start = Date.now();
+      const t = setInterval(()=>{
+        if (cond()) { clearInterval(t); resolve(true); }
+        else if (Date.now() - start > timeout) { clearInterval(t); reject(new Error('waitFor timeout')); }
+      }, interval);
+    });
+  }
+
   // Boot
-   window.addEventListener('load', async ()=>{
+  window.addEventListener('load', async ()=>{
     const tabs = document.querySelectorAll('.tabbar .tab');
-     // Инициализация Supabase
-try {
+    tabs.forEach(btn=>btn.addEventListener('click', ()=>{
+      tabs.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      route(btn.getAttribute('data-tab'));
+    }));
+
+    // Инициализация Supabase и первичная загрузка данных
+    try {
       await DBAPI.init({ url: window.__SUPA_URL__, anonKey: window.__SUPA_ANON__ });
       const { users, rels } = await DBAPI.loadAll();
-     window.DB.users = users;
-      window.DB.rels = rels;
+      window.DB.users = users || [];
+      window.DB.rels  = rels  || [];
     } catch (e) {
-      console.warn('Supabase init/load failed, falling back to local data', e);
+      console.warn('Supabase init/load failed, fallback to local data', e);
+      // на случай оффлайна/ошибки оставляем data.js
+      window.DB.users = window.DB.users || [];
+      window.DB.rels  = window.DB.rels  || [];
     }
-    tabs.forEach(btn=>btn.addEventListener('click', ()=>{
-      tabs.forEach(b=>b.classList.remove('active')); btn.classList.add('active'); route(btn.getAttribute('data-tab'));
-    }));
+
     // Invite & login flow
     if(!localStorage.getItem('mt_invited')){
       showInvite();
@@ -86,14 +113,21 @@ try {
     }
   });
 
-  window.route = function(tab){
+  window.route = async function(tab){
     switch(tab){
-      case 'feed': Feed.page(); break;
-      case 'tree': Tree.page(); break;
+      case 'feed':     Feed.page(); break;
+      case 'tree':
+        // ждём, пока инициализируется модуль дерева
+        if (!window.Tree || !Tree.page) {
+          try { await waitFor(()=> window.Tree && typeof Tree.page === 'function'); }
+          catch(e){ console.warn('Tree still not ready:', e); return; }
+        }
+        Tree.page();
+        break;
       case 'calendar': Calendar.page(); break;
-      case 'groups': Groups.page(); break;
-      case 'profile': Profile.page(); break;
-      default: Feed.page();
+      case 'groups':   Groups.page(); break;
+      case 'profile':  Profile.page(); break;
+      default:         Feed.page();
     }
   };
 })();
