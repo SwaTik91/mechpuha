@@ -91,10 +91,12 @@ if (!FamilyTree.templates.shalom) {
            style="font-size:12px;font-weight:600;fill:#2563eb"
            text-anchor="start">{val}</text>`;
 
-  // линии
-  FamilyTree.templates.shalom.link =
-    `<path stroke="#9ca3af" stroke-width="2" fill="none"></path>`;
-  FamilyTree.templates.shalom.partnerConnector = { stroke: "#9ca3af", "stroke-width": 2 };
+
+// линии связей — красные и жирные
+FamilyTree.templates.shalom.link =
+  `<path stroke="#dc2626" stroke-width="4" fill="none"></path>`;
+FamilyTree.templates.shalom.partnerConnector = { stroke: "#dc2626", "stroke-width": 4 };
+
 
   FamilyTree.templates.shalom.plus =
     `<circle cx="15" cy="15" r="15" fill="#ff7a00"></circle>
