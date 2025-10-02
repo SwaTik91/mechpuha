@@ -249,7 +249,6 @@ function buildBalkanData(DB) {
       u.city ? ` • ${u.city}` : ''
     ].join(' ').trim();
 
-    const n = { id, name: u.name, subtitle };
     const [nameTop, nameBottom] = splitName(u.name);
     const relation = kinLabel(DB, num2id, id2num, u.id, DB.currentUserId);
     const n = { id, nameTop, nameBottom, subtitle, relation };
