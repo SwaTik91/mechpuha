@@ -93,9 +93,14 @@ if (!FamilyTree.templates.shalom) {
 
 
 // линии связей — красные и жирные
-FamilyTree.templates.shalom.link =
-  `<path stroke="#dc2626" stroke-width="4" fill="none"></path>`;
-FamilyTree.templates.shalom.partnerConnector = { stroke: "#dc2626", "stroke-width": 4 };
+  // 👉 ЛИНИИ ВСЕГДА ПЕРЕОПРЕДЕЛЯЕМ (красные и толстые)
+  FamilyTree.templates.shalom.link =
+    `<path stroke="#dc2626" stroke-width="5" stroke-linecap="round" fill="none"></path>`;
+  FamilyTree.templates.shalom.partnerConnector = {
+    stroke: "#dc2626",
+    "stroke-width": 5,
+    "stroke-linecap": "round"
+ };
 
 
   FamilyTree.templates.shalom.plus =
@@ -128,8 +133,10 @@ function renderFamilyTree() {
         if (args && args.node) openProfile(data.num2id.get(args.node.id)); 
       }
     });
-  } else {
+} else {
     family.load(data.nodes);
+    // форсируем перерисовку, чтобы подтянулись новые стили шаблона
+    try { family.draw(1); } catch(e) {}
   }
 
 // показать всё и сфокусироваться на тебе
