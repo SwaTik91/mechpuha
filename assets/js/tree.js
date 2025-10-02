@@ -92,15 +92,18 @@ if (!FamilyTree.templates.shalom) {
            text-anchor="start">{val}</text>`;
 
 
-// линии связей — красные и жирные
-  // 👉 ЛИНИИ ВСЕГДА ПЕРЕОПРЕДЕЛЯЕМ (красные и толстые)
+  // 👉 Правильный шаблон линка (родитель-ребёнок): с координатами и data-l-id (см. доки)
   FamilyTree.templates.shalom.link =
-    `<path stroke="#dc2626" stroke-width="5" stroke-linecap="round" fill="none"></path>`;
+    `<path stroke="#dc2626" stroke-width="5" stroke-linecap="round" fill="none"
+            data-l-id="[{id}][{child-id}]"
+            d="M{xa},{ya} C{xb},{yb} {xc},{yc} {xd},{yd}" />`;
+
+  // 👉 Соединитель супругов (жирный красный)
   FamilyTree.templates.shalom.partnerConnector = {
     stroke: "#dc2626",
     "stroke-width": 5,
     "stroke-linecap": "round"
- };
+  };
 
 
   FamilyTree.templates.shalom.plus =
