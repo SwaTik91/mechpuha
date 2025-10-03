@@ -9,44 +9,36 @@ window.Calendar = (function(){
     const today = new Date();
     const startY = today.getFullYear();
 
-    // ДР: считаем следующее наступление в этом/следующем году
     const birthdays = (DB.users||[])
-      .filter(u => u.dob)  // ISO yyyy-mm-dd
+      .filter(u => u.dob)
       .map(u => {
         const [y,m,d] = u.dob.split('-').map(Number);
         const next = new Date(startY, m-1, d);
         if (isPast(next, today)) next.setFullYear(startY + 1);
         return {
           kind: 'birthday',
-          title: 'День рождения: ' + u.name,
+          title: 'День рождения: ' + (u.name||''),
           date: next,
           dateText: formatDate(next),
           place: ''
         };
       });
 
-    // События: видим свои и куда приглашён
     const events = (DB.events||[])
       .filter(e => e.owner === me || (e.invited||[]).includes(me))
       .map(e => {
         const dt = parseYMD(e.date);
-        const next = dt ? new Date(dt) : null;
-        if (next && isPast(next, today)) {
-          // события в прошлом оставляем внизу списка
-          next._past = true;
-        }
+        const next = dt ? new Date(dt) : new Date(2100,0,1);
         return {
-          kind: e.type,              // wedding / brit / barmitzvah / mourning / ...
+          kind: e.type,
           title: e.title,
-          date: next || new Date(2100,0,1), // безопасный fallback
+          date: next,
           dateText: e.date || '',
           place: e.place || ''
         };
       });
 
-    const items = [...birthdays, ...events]
-      .sort((a,b) => a.date - b.date);
-
+    const items = [...birthdays, ...events].sort((a,b)=> a.date - b.date);
     v.innerHTML = `<div class="list">${
       items.length ? items.map(renderItem).join('') : '<div class="muted">Пока пусто</div>'
     }</div>`;
