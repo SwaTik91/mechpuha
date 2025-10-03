@@ -16,6 +16,56 @@
     `);
   }
 
+// Внутри (function(){ ... }) общего файла app.js
+
+window.App = window.App || {};
+
+App.afterAuth = async function(){
+  // грузим облачные данные
+  try{
+    const { users, rels } = await DBAPI.loadAll();
+    window.DB.users = users || [];
+    window.DB.rels  = rels  || [];
+  }catch(e){
+    console.warn('LoadAll failed, fallback to local data', e);
+    window.DB.users = window.DB.users || [];
+    window.DB.rels  = window.DB.rels  || [];
+  }
+  // устанавливаем currentUserId из сессии
+  const session = await DBAPI.getSession();
+  const uid = session?.user?.id;
+  if (uid) window.DB.currentUserId = uid;
+  route('profile'); // стартуем с профиля после входа
+};
+
+window.addEventListener('load', async ()=>{
+  // таббар
+  const tabs = document.querySelectorAll('.tabbar .tab');
+  tabs.forEach(btn=>btn.addEventListener('click', ()=>{
+    tabs.forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    route(btn.getAttribute('data-tab'));
+  }));
+
+  // инициализация Supabase и проверка сессии
+  try {
+    await DBAPI.init({ url: window.__SUPA_URL__, anonKey: window.__SUPA_ANON__ });
+    const session = await DBAPI.getSession();
+    if (session?.user) {
+      await App.afterAuth();
+    } else {
+      Auth.openLogin(); // показываем окно входа
+    }
+  } catch (e) {
+    console.warn('Supabase init failed', e);
+    alert('Нет подключения к базе. Проверьте настройки.');
+  }
+});
+
+// обновлённый роутер (ниже), см. раздел 3
+
+
+  
   window.showLogin = function(){
     const users = window.DB.users || [];
     const render = (arr)=>{
