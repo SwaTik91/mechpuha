@@ -1,47 +1,51 @@
-// MishpuchaTech Service Worker
-// v4: убрали CSS из предкеша и сделали network-first для стилей
-
-const CACHE_NAME = 'mishpucha-v4';
-const PRECACHE = ['./', './index.html']; // CSS не предкешируем, чтобы не залипала старая версия
-
-self.addEventListener('install', (event) => {
+// sw.js
+const CACHE_STATIC = 'mt-static-v3'; // ← обнови версию
+self.addEventListener('install', (e)=>{
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE))
-  );
+  e.waitUntil(caches.open(CACHE_STATIC).then(cache => cache.addAll([
+    '/',             // если деплой из корня; для подкаталога укажи правильный путь
+    '/index.html',
+    '/assets/css/style.css',
+    // минимум критичных ассетов; не клади сюда app.js, чтобы не залипал
+  ])));
 });
+self.addEventListener('activate', (e)=>{
+  clients.claim();
+  e.waitUntil(caches.keys().then(keys=>Promise.all(
+    keys.filter(k=>k!==CACHE_STATIC).map(k=>caches.delete(k))
+  )));
+});
+self.addEventListener('fetch', (e)=>{
+  const url = new URL(e.request.url);
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil((async () => {
-    const keys = await caches.keys();
-    await Promise.all(
-      keys.map((k) => (k !== CACHE_NAME ? caches.delete(k) : Promise.resolve()))
+  // HTML всегда тянем из сети (с фолбэком из кэша)
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request).catch(()=>caches.match('/index.html'))
     );
-    await self.clients.claim();
-  })());
-});
-
-self.addEventListener('fetch', (event) => {
-  const req = event.request;
-
-  // Для CSS — network-first (при офлайне — из кэша)
-  if (req.destination === 'style' || req.url.endsWith('.css')) {
-    event.respondWith((async () => {
-      try {
-        const fresh = await fetch(req, { cache: 'no-store' });
-        const cache = await caches.open(CACHE_NAME);
-        cache.put(req, fresh.clone());
-        return fresh;
-      } catch {
-        const cached = await caches.match(req);
-        return cached || fetch(req);
-      }
-    })());
     return;
   }
 
-  // Остальные запросы — cache-first
-  event.respondWith(
-    caches.match(req).then((cached) => cached || fetch(req))
+  // CSS — network-first (как у тебя было — ок)
+  if (url.pathname.endsWith('.css')) {
+    e.respondWith(
+      fetch(e.request).then(r=>{
+        const copy = r.clone();
+        caches.open(CACHE_STATIC).then(c=>c.put(e.request, copy));
+        return r;
+      }).catch(()=>caches.match(e.request))
+    );
+    return;
+  }
+
+  // Остальное — stale-while-revalidate
+  e.respondWith(
+    caches.match(e.request).then(cached=>{
+      const fetchPromise = fetch(e.request).then(networkResp=>{
+        caches.open(CACHE_STATIC).then(c=>c.put(e.request, networkResp.clone()));
+        return networkResp;
+      }).catch(()=>cached);
+      return cached || fetchPromise;
+    })
   );
 });
