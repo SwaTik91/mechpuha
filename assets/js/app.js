@@ -180,4 +180,25 @@ window.addEventListener('load', async ()=>{
       default:         Feed.page();
     }
   };
+
+window.route = async function(tab){
+  switch(tab){
+    case 'profile':    Profile.page(); break;
+    case 'synagogues': Synagogues.page(); break;
+    case 'tree':
+           // ждём, пока инициализируется модуль дерева
+        if (!window.Tree || !Tree.page) {
+          try { await waitFor(()=> window.Tree && typeof Tree.page === 'function'); }
+          catch(e){ console.warn('Tree still not ready:', e); return; }
+        }
+        Tree.page();
+        break;
+    case 'invites':    Invites.page(); break;
+    case 'messages':   Messages.page(); break;
+    case 'calendar':   Calendar.page(); break;   // ← добавили
+    default:           Profile.page();
+  }
+};
+
+  
 })();
