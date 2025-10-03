@@ -20,6 +20,12 @@
     deleteRel,
     /** Полная перезагрузка из БД */
     reloadIntoWindowDB,
+      // NEW:
+    signUp,
+    signIn,
+    signOut,
+    getSession,
+    updatePassword,
   };
 
   // --- INTERNAL STATE -------------------------------------------------------
@@ -38,6 +44,54 @@
     return true;
   }
 
+  async function signUp({ email, password, lastname, firstname, patronymic, dob, city }) {
+  requireInit();
+  const { data: auth, error: e1 } = await supabase.auth.signUp({ email, password });
+  if (e1) throw e1;
+  const uid = auth.user?.id;
+  const fullName = [lastname, firstname, patronymic].filter(Boolean).join(' ').trim();
+  // создаём запись пользователя в таблице users (id = uid)
+  const payload = { id: uid, name: fullName, dob: dob || null, city: city || null };
+  const { error: e2 } = await supabase.from('users').insert(payload);
+  if (e2) throw e2;
+  return { id: uid, email };
+}
+
+async function signIn({ email, password }) {
+  requireInit();
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data.session || null;
+}
+
+async function signOut() {
+  requireInit();
+  await supabase.auth.signOut();
+  return true;
+}
+
+async function getSession() {
+  requireInit();
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return data.session || null;
+}
+
+async function updatePassword({ oldPassword, newPassword, email }) {
+  requireInit();
+  // 1) верифицируем старый пароль
+  if (email && oldPassword) {
+    const { error: e1 } = await supabase.auth.signInWithPassword({ email, password: oldPassword });
+    if (e1) throw e1;
+  }
+  // 2) меняем пароль
+  const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+  return true;
+}
+
+
+  
   async function loadAll() {
     requireInit();
     const [{ data: users, error: eu }, { data: rels, error: er }] = await Promise.all([
