@@ -1,10 +1,11 @@
 // assets/js/auth.js
 window.Auth = (function(){
-  // Стартовый экран: выбор — инвайт или вход
+  // Стартовый экран: инвайт -> регистрация ИЛИ вход по почте/паролю
   function openStart(){
     UI.sheet(`
       <div class="vstack">
         <div class="section-title">Добро пожаловать в MishpuchaTech</div>
+
         <div class="card vstack">
           <div class="section-title">Регистрация по инвайту</div>
           <input id="invite_code" class="input" placeholder="Инвайт-код (например, 2025)" inputmode="numeric">
@@ -20,33 +21,13 @@ window.Auth = (function(){
     `);
   }
 
-  // Проверяем код инвайта (локально или через БД) и открываем форму регистрации
   async function checkInviteAndRegister(){
     const code = val('invite_code');
     if(!code){ alert('Введите код приглашения'); return; }
-
-    // 1) локальный вариант (как в твоём прототипе — DB.invites)
     const localOk = Array.isArray(window.DB?.invites) && window.DB.invites.includes(code);
-
-    // 2) если хочешь через Supabase (таблица invites) — раскомментируй:
-    // let remoteOk = false;
-    // try{
-    //   const { data, error } = await window.supabase
-    //     .from('invites')
-    //     .select('code, expires_at, max_uses, used_count')
-    //     .eq('code', code)
-    //     .maybeSingle();
-    //   if(!error && data){
-    //     const notExpired = !data.expires_at || new Date(data.expires_at) > new Date();
-    //     const hasUses = (data.used_count||0) < (data.max_uses||1);
-    //     remoteOk = notExpired && hasUses;
-    //   }
-    // }catch(e){ console.warn('invite check failed', e); }
-
-    if (localOk /*|| remoteOk*/) {
-      // можно сохранить флаг, что инвайт проверен (по желанию)
+    if (localOk) {
       localStorage.setItem('mt_invited','1');
-      openRegister(); // открываем форму регистрации
+      openRegister();
     } else {
       alert('Неверный или недействительный инвайт');
     }
@@ -86,7 +67,6 @@ window.Auth = (function(){
   }
 
   async function doRegister(){
-    // на всякий случай — требуем, чтобы человек пришёл через инвайт
     if (!localStorage.getItem('mt_invited')) {
       alert('Регистрация доступна только по инвайту'); return;
     }
