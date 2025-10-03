@@ -1,4 +1,4 @@
-/* FamilyTreeJS integration: full logic + nicer template */
+/* FamilyTreeJS integration: full logic + template + robust mount */
 window.Tree = (function () {
   let family = null;
   let isBalkanReady = false;
@@ -12,9 +12,8 @@ window.Tree = (function () {
 
     const v = UI.view();
     // safety guards: library, auth, data
-    if (!window.FamilyTree) {
-      v.innerHTML = `<div class="card"><div class="section-title">Дерево недоступно</div><div class="muted">Не загружена библиотека FamilyTree.</div></div>`;
-      return;
+    if (!window.FamilyTree && !document.querySelector('script[src$="familytree.js"]')) {
+      // дадим шанс ensureBalkanLoaded подтянуть скрипт
     }
     if (!window.DB || !DB.currentUserId) {
       v.innerHTML = `<div class="card"><div class="section-title">Нет профиля</div><div class="muted">Войдите и заполните профиль.</div></div>`;
@@ -29,7 +28,7 @@ window.Tree = (function () {
     <div id="treeContainer"
            style="width:100%;height:76vh;background:#fff;border-radius:12px;border:1px solid #e5e7eb;
                   position:relative;overflow:hidden;touch-action:pan-x pan-y;"
-      </div>`;
+      ></div>`;
 
     if (!isBalkanReady) {
       await ensureBalkanLoaded();
@@ -91,7 +90,7 @@ window.Tree = (function () {
                style="font-size:18px;font-weight:700;fill:#111827;line-height:1.15"
                text-anchor="start">{val}</text>`;
 
-      // отчество
+      // отчество / хвост ФИО
       FamilyTree.templates.shalom.field_2 =
         `<text ${FamilyTree.attr.width}="300" ${FamilyTree.attr.wrap}="true"
                x="18" y="92"
@@ -112,17 +111,31 @@ window.Tree = (function () {
         "stroke-linecap": "round"
       };
 
-
       FamilyTree.templates.shalom.plus =
         `<circle cx="15" cy="15" r="15" fill="#ff7a00"></circle>
          <text x="15" y="20" fill="#fff" text-anchor="middle" font-size="20">+</text>`;
     }
+  }
 
-
+  async function waitForLayout(el, tries = 30) {
+    for (let i = 0; i < tries; i++) {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) return;
+      await new Promise(r => requestAnimationFrame(r));
+    }
+    console.warn('treeContainer has zero size after wait');
   }
 
   async function renderFamilyTree() {
     const container = document.getElementById('treeContainer');
+    if (!container) return;
+
+    // Подстраховка на высоту, если стили не применились
+    if (!container.style.height) container.style.height = '76vh';
+
+    // Ждём, пока контейнер реально станет ненулевого размера
+    await waitForLayout(container);
+
     const data = buildBalkanData(DB); // { nodes, num2id, rootNum, roots }
 
     if (!data.nodes.length) {
@@ -130,34 +143,49 @@ window.Tree = (function () {
       return;
     }
 
+    // Валидация узлов (ловим любые NaN до инициализации)
+    const bad = data.nodes.find(n =>
+      !Number.isFinite(n.id) ||
+      (n.fid && !Number.isFinite(n.fid)) ||
+      (n.mid && !Number.isFinite(n.mid)) ||
+      (Array.isArray(n.pids) && n.pids.some(p => !Number.isFinite(p)))
+    );
+    if (bad) {
+      console.warn('Bad node for FamilyTree:', bad);
+      container.innerHTML = `<div class="card" style="margin:12px">Данные узла повреждены</div>`;
+      return;
+    }
+
+    // Отключаем внутренний lazy-loading — рисуем сразу, даже если таб скрыт
+    if (window.FamilyTree) window.FamilyTree.LAZY_LOADING = false;
+
     if (!family) {
-    family = new window.FamilyTree(container, {
+      family = new window.FamilyTree(container, {
         template: 'shalom',
         nodeBinding: { field_0: 'nameTop', field_2: 'nameBottom', field_1: 'subtitle', field_3: 'relation' },
         mouseScrool: window.FamilyTree.action.zoom,
         minZoom: .5, maxZoom: 2, scaleInitial: window.innerWidth < 768 ? 0.8 : 1,
         siblingSeparation: 90, levelSeparation: 80, subtreeSeparation: 110,
         nodes: data.nodes,
-        // roots убираем полностью, иначе дерево обрезается и показываются только ближайшие
+        // roots не используем (показываем всю компоненту), фокус делаем вручную
         nodeMouseClick: (args) => { 
           if (args && args.node) openProfile(data.num2id.get(args.node.id)); 
         }
       });
-  } else {
+    } else {
       family.load(data.nodes);
-      // форсируем перерисовку, чтобы подтянулись новые стили шаблона
-      try { family.draw(1); } catch(e) {}
+      await new Promise(r => requestAnimationFrame(r));
     }
 
-  // показать всё и сфокусироваться на тебе
-  setTimeout(() => {
-    try { family.fit(); } catch(e) {}
-    if (data.rootNum) {
-      try { family.center(data.rootNum); family.select(data.rootNum); } catch(e) {}
-    }
-  }, 0);
+    // показать всё и сфокусироваться на тебе
+    setTimeout(() => {
+      try { family.fit(); } catch (e) {}
+      const root = Number.isFinite(data.rootNum) ? data.rootNum : null;
+      if (root) {
+        try { family.center(root); family.select(root); } catch (e) {}
+      }
+    }, 0);
   }
-
 
   /* ----- Адаптер: строки -> числа, связи -> fid/mid/pids (минимально и устойчиво) ----- */
   function buildBalkanData(DB) {
@@ -167,22 +195,22 @@ window.Tree = (function () {
     if (meId) {
       keep = new Set([meId]);
       const adj = new Map();
-      for (const r of (DB.rels||[])){
-        if(!adj.has(r.a)) adj.set(r.a, new Set());
-        if(!adj.has(r.b)) adj.set(r.b, new Set());
-        if (r.type==='parent' || r.type==='child' || r.type==='sibling' || r.type==='spouse') {
+      for (const r of (DB.rels || [])) {
+        if (!adj.has(r.a)) adj.set(r.a, new Set());
+        if (!adj.has(r.b)) adj.set(r.b, new Set());
+        if (r.type === 'parent' || r.type === 'child' || r.type === 'sibling' || r.type === 'spouse') {
           adj.get(r.a).add(r.b);
           adj.get(r.b).add(r.a);
         }
       }
-      const q=[meId];
-      while(q.length){
-        const cur=q.shift();
-        const ns=adj.get(cur)||new Set();
-        for(const n of ns){ if(!keep.has(n)){ keep.add(n); q.push(n);} }
+      const q = [meId];
+      while (q.length) {
+        const cur = q.shift();
+        const ns = adj.get(cur) || new Set();
+        for (const n of ns) { if (!keep.has(n)) { keep.add(n); q.push(n); } }
       }
     }
-    const usersList = keep ? (DB.users||[]).filter(u=>keep.has(u.id)) : (DB.users||[]);
+    const usersList = keep ? (DB.users || []).filter(u => keep.has(u.id)) : (DB.users || []);
 
     // 1) Маппинг строковых id -> числовых id (требование FamilyTreeJS)
     const id2num = new Map(), num2id = new Map();
@@ -190,7 +218,7 @@ window.Tree = (function () {
     for (const u of usersList) {
       if (!id2num.has(u.id)) { id2num.set(u.id, seq); num2id.set(seq, u.id); seq++; }
     }
-    // учтем id из rels, если там есть "временные" узлы без записи в users
+    // учтём id из rels, если там есть узлы, которых нет в users
     for (const r of (DB.rels || [])) {
       if (keep && (!keep.has(r.a) || !keep.has(r.b))) continue;
       if (!id2num.has(r.a)) { id2num.set(r.a, seq); num2id.set(seq, r.a); seq++; }
@@ -200,7 +228,6 @@ window.Tree = (function () {
     // 2) Индексы связей
     const parentsByChild = new Map();   // num(child) -> Set(num(parent))
     const partners       = new Map();   // явные супруги из rels: num -> Set(numPartner)
-    const inferredPartners = new Map(); // партнёры по детям (инферим супругов): num -> Set(numPartner)
     const siblings       = [];          // пары брат/сестра
 
     const setAdd = (map, key, val) => {
@@ -217,7 +244,7 @@ window.Tree = (function () {
         // a — родитель b
         setAdd(parentsByChild, b, a);
       } else if (r.type === 'child') {
-        // a — ребенок, b — родитель (реже встречается)
+        // a — ребёнок, b — родитель (реже встречается)
         setAdd(parentsByChild, a, b);
       } else if (r.type === 'spouse') {
         setAdd(partners, a, b);
@@ -288,19 +315,6 @@ window.Tree = (function () {
       if (explicitPids && explicitPids.length) n.pids = explicitPids;
       return n;
     });
-
-    // 7) Применяем инференс супругов: добавим виртуальные pids там, где явных spouse нет
-    const byId = new Map(nodes.map(n => [n.id, n]));
-    for (const [a, setB] of inferredPartners.entries()) {
-      const nodeA = byId.get(a);
-      if (!nodeA) continue;
-      const explicit = partners.has(a) ? partners.get(a) : new Set();
-      const aPids = new Set(nodeA.pids || []);
-      for (const b of setB) {
-        if (!explicit.has(b)) aPids.add(b);
-      }
-      nodeA.pids = Array.from(aPids).sort((x, y) => x - y);
-    }
 
     // корень: текущий пользователь
     const rootNum = id2num.get(DB.currentUserId);
@@ -535,7 +549,7 @@ window.Tree = (function () {
     }
   }
 
-  // ДОБАВЬ ЭТУ ФУНКЦИЮ (рядом с linkByRelation)
+  // Добавление связи в Supabase
   async function addRelationSupa(me, otherId, type) {
     if (!window.DBAPI?.addRel) throw new Error('DBAPI.addRel не найден (Supabase не инициализирован).');
 
@@ -561,6 +575,17 @@ window.Tree = (function () {
       const auntId = (document.getElementById('rel_aunt') || {}).value;
       if (!auntId) { alert('Выберите дядю/тётю'); return; }
       await DBAPI.addRel({ type: 'parent', a: auntId, b: otherId });
+    } else if (type === 'grandparent') {
+      // дед/бабушка: otherId — родитель моего родителя
+      const p = getDefaultParent(me);
+      if (!p) { alert('Сначала добавьте родителей.'); return; }
+      await DBAPI.addRel({ type: 'parent', a: otherId, b: p });
+    } else if (type === 'grandchild') {
+      // внук/внучка: otherId — ребёнок моего ребёнка
+      const children = DB.rels.filter(r=>r.type==='parent' && r.a===me).map(r=>r.b);
+      const firstChild = children[0];
+      if (!firstChild) { alert('Сначала добавьте детей.'); return; }
+      await DBAPI.addRel({ type: 'parent', a: firstChild, b: otherId });
     } else {
       console.warn('Неизвестный тип связи:', type);
     }
@@ -590,6 +615,13 @@ window.Tree = (function () {
       if (auntId) {
         DB.rels.push(rel(auntId, otherId, 'parent'));
       }
+    } else if (type === 'grandparent') {
+      const p = getDefaultParent(me);
+      if (p) DB.rels.push(rel(otherId, p, 'parent'));
+    } else if (type === 'grandchild') {
+      const children = DB.rels.filter(r=>r.type==='parent' && r.a===me).map(r=>r.b);
+      const firstChild = children[0];
+      if (firstChild) DB.rels.push(rel(firstChild, otherId, 'parent'));
     }
   }
 
