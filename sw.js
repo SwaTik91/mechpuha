@@ -1,48 +1,61 @@
 // sw.js
-const CACHE_STATIC = 'mt-static-v4'; // ← обнови версию
+const CACHE_STATIC = 'mt-static-v4'; // увеличь версию при каждом релизе
+
 self.addEventListener('install', (e)=>{
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE_STATIC).then(cache => cache.addAll([
-    '/',             // если деплой из корня; для подкаталога укажи правильный путь
-    '/index.html',
-    '/assets/css/style.css',
-    // минимум критичных ассетов; не клади сюда app.js, чтобы не залипал
-  ])));
+  e.waitUntil(
+    caches.open(CACHE_STATIC).then(cache => cache.addAll([
+      // если сайт в подкаталоге, укажи относительные пути
+      'index.html',
+      'assets/css/style.css',
+      'assets/icons/profile.svg',
+      'assets/icons/tree.svg',
+      'assets/icons/chat.svg',
+      'assets/icons/feed.svg',
+      'assets/icons/calendar.svg'
+    ])).catch(()=>{})
+  );
 });
+
 self.addEventListener('activate', (e)=>{
   clients.claim();
-  e.waitUntil(caches.keys().then(keys=>Promise.all(
-    keys.filter(k=>k!==CACHE_STATIC).map(k=>caches.delete(k))
-  )));
+  e.waitUntil(
+    caches.keys().then(keys => Promise.all(
+      keys.filter(k => k !== CACHE_STATIC).map(k => caches.delete(k))
+    ))
+  );
 });
-self.addEventListener('fetch', (e)=>{
-  const url = new URL(e.request.url);
 
-  // HTML всегда тянем из сети (с фолбэком из кэша)
-  if (e.request.mode === 'navigate') {
+// Стратегии:
+// - HTML: Network-first (чтобы получать свежие версии), fallback на кэш
+// - CSS: Network-first (как у тебя изначально)
+// - Остальное: Stale-while-revalidate
+self.addEventListener('fetch', (e)=>{
+  const req = e.request;
+  const url = new URL(req.url);
+
+  if (req.mode === 'navigate') {
     e.respondWith(
-      fetch(e.request).catch(()=>caches.match('/index.html'))
+      fetch(req).catch(()=>caches.match('index.html'))
     );
     return;
   }
 
-  // CSS — network-first (как у тебя было — ок)
   if (url.pathname.endsWith('.css')) {
     e.respondWith(
-      fetch(e.request).then(r=>{
+      fetch(req).then(r=>{
         const copy = r.clone();
-        caches.open(CACHE_STATIC).then(c=>c.put(e.request, copy));
+        caches.open(CACHE_STATIC).then(c=>c.put(req, copy));
         return r;
-      }).catch(()=>caches.match(e.request))
+      }).catch(()=>caches.match(req))
     );
     return;
   }
 
-  // Остальное — stale-while-revalidate
   e.respondWith(
-    caches.match(e.request).then(cached=>{
-      const fetchPromise = fetch(e.request).then(networkResp=>{
-        caches.open(CACHE_STATIC).then(c=>c.put(e.request, networkResp.clone()));
+    caches.match(req).then(cached=>{
+      const fetchPromise = fetch(req).then(networkResp=>{
+        caches.open(CACHE_STATIC).then(c=>c.put(req, networkResp.clone()));
         return networkResp;
       }).catch(()=>cached);
       return cached || fetchPromise;
