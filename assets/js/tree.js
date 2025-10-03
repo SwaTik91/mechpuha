@@ -61,7 +61,9 @@ window.Tree = (function () {
       setupTemplateOnce();
 
       // Построение узлов FT
-      const { nodes } = buildFamilyTreeData(DB);
+      const meId = DB.currentUserId;
+      const { nodes } = buildFamilyTreeData(DB, meId);
+
 
       // Инициализация FamilyTree
       const el = document.getElementById('treeContainer');
@@ -145,53 +147,65 @@ window.Tree = (function () {
   // =========================
   // СБОР ДАННЫХ ДЛЯ FT
   // =========================
-  function buildFamilyTreeData(DB) {
-    const users = DB.users || [];
-    const rels = DB.rels || [];
+function buildFamilyTreeData(DB, meId) {
+  const allUsers = DB.users || [];
+  const rels = DB.rels || [];
 
-    // Подготовим супругов: pids — массив партнёров
-    const spouses = {};
-    rels.filter(r => r.type === 'spouse').forEach(r => {
-      spouses[r.a] = spouses[r.a] || [];
-      spouses[r.b] = spouses[r.b] || [];
-      if (!spouses[r.a].includes(r.b)) spouses[r.a].push(r.b);
-      if (!spouses[r.b].includes(r.a)) spouses[r.b].push(r.a);
-    });
-
-    // Детско-родительские связи по умолчанию в прототипе могли быть как parent/child
-    // Пройдём обе стороны и соберём детей по родителям
-    const children = {}; // parentId -> [childIds]
-    rels.forEach(r => {
-      if (r.type === 'parent' && r.a && r.b) {
-        // a - родитель, b - ребёнок
-        children[r.a] = children[r.a] || [];
-        if (!children[r.a].includes(r.b)) children[r.a].push(r.b);
-      }
-      if (r.type === 'child' && r.a && r.b) {
-        // a - ребёнок, b - родитель (иногда встречается так в моках)
-        children[r.b] = children[r.b] || [];
-        if (!children[r.b].includes(r.a)) children[r.b].push(r.a);
-      }
-    });
-
-    // FT узлы
-    const nodes = users.map(u => {
-      const n = {
-        id: u.id,
-        name: u.name || '(без имени)',
-        dob: u.dob || '',
-        city: u.city || ''
-      };
-      if (spouses[u.id]?.length) n.pids = spouses[u.id]; // супруги
-      return n;
-    });
-
-    // Примечание: FamilyTree для отображения детей обычно использует пары (mid/fid) или stpid-группы у партнёров.
-    // Здесь мы оставим базовую визуализацию через узлы + pids (супруги), а children дадут FT логику пар.
-    // Для простоты, если у родителя есть список детей, но у него нет партнёра — FT сам добавит "виртуального" партнёра.
-
-    return { nodes };
+  // строим неориентированный граф соседей по связям
+  const adj = new Map(); // id -> Set(neighbors)
+  function link(a,b){
+    if(!a||!b) return;
+    if(!adj.has(a)) adj.set(a,new Set());
+    if(!adj.has(b)) adj.set(b,new Set());
+    adj.get(a).add(b);
+    adj.get(b).add(a);
   }
+
+  // parent/child/sibling/spouse считаем связями «родства» в обе стороны
+  for (const r of rels) {
+    if (r.type === 'parent' || r.type === 'child' || r.type === 'sibling' || r.type === 'spouse') {
+      link(r.a, r.b);
+    }
+  }
+
+  // BFS/DFS от meId → собираем только «мою компоненту»
+  const keep = new Set();
+  if (meId) {
+    const q = [meId];
+    keep.add(meId);
+    while (q.length) {
+      const cur = q.shift();
+      const nexts = adj.get(cur) || new Set();
+      for (const n of nexts) {
+        if (!keep.has(n)) { keep.add(n); q.push(n); }
+      }
+    }
+  }
+
+  // фильтруем пользователей: только те, кто достижим от меня
+  const users = meId ? allUsers.filter(u => keep.has(u.id)) : allUsers;
+
+  // супруги для FamilyTree (pids)
+  const spouses = {};
+  rels.filter(r => r.type === 'spouse' && keep.has(r.a) && keep.has(r.b)).forEach(r => {
+    (spouses[r.a] = spouses[r.a] || []).push(r.b);
+    (spouses[r.b] = spouses[r.b] || []).push(r.a);
+  });
+
+  const nodes = users.map(u => {
+    const n = {
+      id: u.id,
+      name: u.name || '(без имени)',
+      dob: u.dob || '',
+      city: u.city || ''
+    };
+    if (spouses[u.id]?.length) n.pids = spouses[u.id];
+    return n;
+  });
+
+  return { nodes };
+}
+
 
   // =========================
   // UI «карточка» пользователя
