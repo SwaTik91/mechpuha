@@ -9,27 +9,50 @@
   async function init({ url, anonKey }){
     if(!url || !anonKey) throw new Error('Missing Supabase config');
     supabase = window.supabase.createClient(url, anonKey);
-    window.supabase = supabase; // экспорт для resend() и т.п.
+    window.supabase = supabase;
     return true;
   }
 
   // --------- AUTH ---------
   async function signUp({ email, password, lastname, firstname, patronymic, dob, city }){
     requireInit();
-    const { data: auth, error: e1 } = await supabase.auth.signUp({
-      email, password,
-      // Если вернёшь подтверждение e-mail, добавь emailRedirectTo:
-      // options: { emailRedirectTo: window.location.origin }
-    });
+    // 1) создаём аккаунт
+    const { data: auth, error: e1 } = await supabase.auth.signUp({ email, password });
     if (e1) throw e1;
     const uid = auth.user?.id;
     if (!uid) throw new Error('No user id from auth.signUp');
 
-    const name = [lastname, firstname, patronymic].filter(Boolean).join(' ').trim();
-    const payload = { id: uid, name, dob: dob || null, city: city || null };
-    const { error: e2 } = await supabase.from('users').insert(payload);
+    const name = [lastname, firstname, patronymic].filter(Boolean).join(' ').trim() || email;
+
+    // 2) пробуем "забрать" существующий черновик по (name+dob)
+    let claimedId = null;
+    try{
+      const { data, error } = await supabase.rpc('claim_placeholder', { p_name: name, p_dob: dob || null });
+      if (error) console.warn('claim_placeholder error', error);
+      if (data) claimedId = data;
+    }catch(e){ console.warn('claim_placeholder failed', e); }
+
+    if (claimedId) {
+      // обновим данные карточки (auth_id уже проставлен на стороне БД)
+      const patch = { name, dob: dob || null, city: city || null, is_placeholder: false };
+      const { data, error } = await supabase.from('users').update(patch).eq('id', claimedId).select().single();
+      if (error) throw error;
+      return { id: claimedId, email };
+    }
+
+    // 3) черновик не найден → создаём полноценный профиль, привязанный к аккаунту
+    const payload = {
+      auth_id: uid,
+      name,
+      dob: dob || null,
+      city: city || null,
+      is_placeholder: false,
+      is_deceased: false,
+      created_by_auth: uid
+    };
+    const { data: row, error: e2 } = await supabase.from('users').insert(payload).select().single();
     if (e2) throw e2;
-    return { id: uid, email };
+    return { id: row.id, email };
   }
 
   async function signIn({ email, password }){
@@ -54,15 +77,13 @@
 
   async function updatePassword({ oldPassword, newPassword, email }){
     requireInit();
-    try{
-      if (email && oldPassword) {
-        const { error: e1 } = await supabase.auth.signInWithPassword({ email, password: oldPassword });
-        if (e1) throw e1;
-      }
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw error;
-      return true;
-    }catch(e){ throw e; }
+    if (email && oldPassword) {
+      const { error: e1 } = await supabase.auth.signInWithPassword({ email, password: oldPassword });
+      if (e1) throw e1;
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+    return true;
   }
 
   // --------- DATA LOADING ---------
@@ -83,10 +104,40 @@
   }
 
   // --------- USERS ---------
-  async function addUser({ id, name, dob, city }){
+  // Создание "черновика" родственника (без аккаунта)
+  async function addUserPlaceholder({ name, dob, city, is_deceased }){
     requireInit();
-    const payload = { name, dob: dob || null, city: city || null };
-    if (id) payload.id = id;
+    const session = await getSession();
+    const uid = session?.user?.id;
+    if (!uid) throw new Error('Not authenticated');
+
+    const payload = {
+      name: name || '(без имени)',
+      dob: dob || null,
+      city: city || null,
+      is_placeholder: true,
+      is_deceased: !!is_deceased,
+      created_by_auth: uid,
+      auth_id: null
+    };
+    const { data, error } = await supabase.from('users').insert(payload).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async function addUser({ id, name, dob, city }){
+    // оставляем как "полный" профиль (редко нужен напрямую)
+    requireInit();
+    const session = await getSession();
+    const uid = session?.user?.id;
+    if (!uid) throw new Error('Not authenticated');
+
+    const payload = {
+      auth_id: uid,
+      name, dob: dob || null, city: city || null,
+      is_placeholder: false, is_deceased: false,
+      created_by_auth: uid
+    };
     const { data, error } = await supabase.from('users').insert(payload).select().single();
     if (error) throw error;
     return data;
@@ -137,7 +188,7 @@
   window.DBAPI = {
     init, getSession, signUp, signIn, signOut, updatePassword,
     loadAll, reloadIntoWindowDB,
-    addUser, updateUser, findUserExact, searchUsers,
+    addUser, addUserPlaceholder, updateUser, findUserExact, searchUsers,
     addRel, deleteRel
   };
 })();
