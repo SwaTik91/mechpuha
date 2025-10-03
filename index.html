@@ -1,61 +1,55 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>MishpuchaTech</title>
 
   <!-- iOS PWA -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Mishpucha">
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="MishpuchaTech" />
   <meta name="theme-color" content="#f6efe9" />
 
   <!-- PWA -->
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
 
   <!-- Styles -->
-  <link rel="stylesheet" href="assets/css/style.css?v=20251003">
-  <link href="familytree.css" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/style.css?v=20251004" />
+  <link rel="stylesheet" href="familytree.css" />
 
-  <!-- Balkan FamilyTreeJS (должен быть ДО tree.js) -->
-  <script defer src="familytree.js"></script>
+  <!-- FamilyTreeJS (CDN для eval-версии) -->
+  <script defer src="https://balkan.app/js/familytree.js"></script>
 
-  <!-- Supabase SDK (фиксированная версия; должен быть ДО db.js) -->
+  <!-- Supabase SDK (зафиксированная версия) -->
   <script defer src="https://unpkg.com/@supabase/supabase-js@2.45.0/dist/umd/supabase.js"></script>
 
-  <!-- Конфигурация Supabase -->
+  <!-- Конфиг Supabase: ЗАМЕНИ на свои значения -->
   <script>
-    // ВСТАВЬ свои значения проекта Supabase (оставляю как у тебя сейчас):
-    window.__SUPA_URL__  = "https://ytgfcsruvhzheeguvwoy.supabase.co";
-    window.__SUPA_ANON__ = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0Z2Zjc3J1dmh6aGVlZ3V2d295Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkzNjg1NzUsImV4cCI6MjA3NDk0NDU3NX0.Gc4T_wLhpvBRpZB6l50SilrXhsXPdZw1c4ZBGkeXMl4";
+    window.__SUPA_URL__  = "https://YOUR-PROJECT.supabase.co";   // <= замени
+    window.__SUPA_ANON__ = "YOUR-ANON-KEY";                      // <= замени
   </script>
 
-  <!-- Модуль работы с БД (использует window.supabase из SDK) -->
-  <script defer src="assets/js/db.js"></script>
+  <!-- База/утилиты -->
+  <script defer src="assets/js/db.js?v=20251004"></script>
+  <script defer src="assets/js/ui.js?v=20251004"></script>
+  <!-- мок-данные на всякий случай (офлайн демо) -->
+  <script defer src="assets/js/data.js?v=20251004"></script>
 
-  <!-- Базовые данные (fallback оффлайн) и UI -->
-  <script defer src="assets/js/data.js"></script>
-  <script defer src="assets/js/ui.js"></script>
-
-  <!-- Аутентификация и экраны -->
-  <script defer src="assets/js/auth.js"></script>
-  <script defer src="assets/js/profile.js"></script>
-
-  <!-- Разделы приложения -->
-  <script defer src="assets/js/synagogues.js"></script>
-  <script defer src="assets/js/tree.js"></script>
-  <script defer src="assets/js/invites.js"></script>
-  <script defer src="assets/js/messages.js"></script>
-  <script defer src="assets/js/groups.js"></script>
-  <script defer src="assets/js/events.js"></script>
-  <script defer src="assets/js/feed.js"></script>
-  <script defer src="assets/js/calendar.js"></script>
-  <script defer src="assets/js/admin.js"></script>
-
-  <!-- Точка входа (последним) -->
-  <script defer src="assets/js/app.js"></script>
+  <!-- Модули -->
+  <script defer src="assets/js/auth.js?v=20251004"></script>
+  <script defer src="assets/js/profile.js?v=20251004"></script>
+  <script defer src="assets/js/synagogues.js?v=20251004"></script>
+  <script defer src="assets/js/tree.js?v=20251004"></script>
+  <script defer src="assets/js/invites.js?v=20251004"></script>
+  <script defer src="assets/js/messages.js?v=20251004"></script>
+  <script defer src="assets/js/groups.js?v=20251004"></script>
+  <script defer src="assets/js/events.js?v=20251004"></script>
+  <script defer src="assets/js/feed.js?v=20251004"></script>
+  <script defer src="assets/js/calendar.js?v=20251004"></script>
+  <script defer src="assets/js/admin.js?v=20251004"></script>
+  <script defer src="assets/js/app.js?v=20251004"></script>
 </head>
 <body>
   <div id="app">
@@ -75,7 +69,7 @@
     </div>
     <div id="backdrop" class="backdrop hidden" aria-hidden="true"></div>
 
-    <!-- Tabbar: 6 вкладок -->
+    <!-- Tabbar (6 вкладок) -->
     <nav class="tabbar" role="navigation" aria-label="Главная навигация">
       <button class="tab active" data-tab="profile" aria-label="Профиль">
         <img src="assets/icons/profile.svg" alt="" /><span>Профиль</span>
@@ -102,7 +96,8 @@
   <script>
     if ('serviceWorker' in navigator) {
       addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(()=>{});
+        // Если деплой в подкаталоге (например, GitHub Pages), используй 'sw.js' без слеша
+        navigator.serviceWorker.register('sw.js').catch(()=>{});
       });
     }
   </script>
