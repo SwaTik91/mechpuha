@@ -16,61 +16,95 @@
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="assets/css/style.css?v=20251001">
+  <link rel="stylesheet" href="assets/css/style.css?v=20251003">
   <link href="familytree.css" rel="stylesheet" />
 
   <!-- Balkan FamilyTreeJS (должен быть ДО tree.js) -->
   <script defer src="familytree.js"></script>
 
-  <!-- Supabase SDK (должен быть ДО db.js) -->
-  <script defer src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <!-- Supabase SDK (фиксированная версия; должен быть ДО db.js) -->
+  <script defer src="https://unpkg.com/@supabase/supabase-js@2.45.0/dist/umd/supabase.js"></script>
+
+  <!-- Конфигурация Supabase -->
   <script>
-    // ВСТАВЬ свои значения проекта Supabase:
+    // ВСТАВЬ свои значения проекта Supabase (оставляю как у тебя сейчас):
     window.__SUPA_URL__  = "https://ytgfcsruvhzheeguvwoy.supabase.co";
     window.__SUPA_ANON__ = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0Z2Zjc3J1dmh6aGVlZ3V2d295Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkzNjg1NzUsImV4cCI6MjA3NDk0NDU3NX0.Gc4T_wLhpvBRpZB6l50SilrXhsXPdZw1c4ZBGkeXMl4";
   </script>
 
-  <!-- Твой модуль работы с БД (использует window.supabase из SDK выше) -->
-  <script defer src="./assets/js/db.js"></script>
+  <!-- Модуль работы с БД (использует window.supabase из SDK) -->
+  <script defer src="assets/js/db.js"></script>
 
-  <!-- Базовые данные и UI -->
+  <!-- Базовые данные (fallback оффлайн) и UI -->
   <script defer src="assets/js/data.js"></script>
   <script defer src="assets/js/ui.js"></script>
 
-  <!-- Фичи приложения -->
-  <script defer src="assets/js/feed.js"></script>
+  <!-- Аутентификация и экраны -->
+  <script defer src="assets/js/auth.js"></script>
+  <script defer src="assets/js/profile.js"></script>
+
+  <!-- Разделы приложения -->
+  <script defer src="assets/js/synagogues.js"></script>
   <script defer src="assets/js/tree.js"></script>
-  <script defer src="assets/js/calendar.js"></script>
+  <script defer src="assets/js/invites.js"></script>
+  <script defer src="assets/js/messages.js"></script>
   <script defer src="assets/js/groups.js"></script>
   <script defer src="assets/js/events.js"></script>
+  <script defer src="assets/js/feed.js"></script>
+  <script defer src="assets/js/calendar.js"></script>
   <script defer src="assets/js/admin.js"></script>
-  <script defer src="assets/js/profile.js"></script>
 
   <!-- Точка входа (последним) -->
   <script defer src="assets/js/app.js"></script>
 </head>
 <body>
   <div id="app">
+    <!-- Header -->
     <header class="ios-header">
       <div id="title">MishpuchaTech</div>
       <div id="header-action"></div>
     </header>
 
-    <main id="view" class="view"></main>
+    <!-- Main view -->
+    <main id="view" class="view" role="main" aria-live="polite"></main>
 
-    <nav class="tabbar">
-      <button data-tab="feed" class="tab active"><img src="assets/icons/feed.svg" alt=""><span>Лента</span></button>
-      <button data-tab="tree" class="tab"><img src="assets/icons/tree.svg" alt=""><span>Древо</span></button>
-      <button data-tab="calendar" class="tab"><img src="assets/icons/calendar.svg" alt=""><span>Календарь</span></button>
-      <button data-tab="groups" class="tab"><img src="assets/icons/chat.svg" alt=""><span>Группы</span></button>
-      <button data-tab="profile" class="tab"><img src="assets/icons/profile.svg" alt=""><span>Профиль</span></button>
+    <!-- Bottom sheet -->
+    <div id="sheet" class="sheet hidden" role="dialog" aria-modal="true">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div id="sheet-content"></div>
+    </div>
+    <div id="backdrop" class="backdrop hidden" aria-hidden="true"></div>
+
+    <!-- Tabbar: 6 вкладок -->
+    <nav class="tabbar" role="navigation" aria-label="Главная навигация">
+      <button class="tab active" data-tab="profile" aria-label="Профиль">
+        <img src="assets/icons/profile.svg" alt="" /><span>Профиль</span>
+      </button>
+      <button class="tab" data-tab="synagogues" aria-label="Синагоги">
+        <img src="assets/icons/calendar.svg" alt="" /><span>Синагоги</span>
+      </button>
+      <button class="tab" data-tab="tree" aria-label="Древо">
+        <img src="assets/icons/tree.svg" alt="" /><span>Древо</span>
+      </button>
+      <button class="tab" data-tab="invites" aria-label="Приглашения">
+        <img src="assets/icons/feed.svg" alt="" /><span>Приглашения</span>
+      </button>
+      <button class="tab" data-tab="messages" aria-label="Сообщения">
+        <img src="assets/icons/chat.svg" alt="" /><span>Сообщения</span>
+      </button>
+      <button class="tab" data-tab="calendar" aria-label="Календарь">
+        <img src="assets/icons/calendar.svg" alt="" /><span>Календарь</span>
+      </button>
     </nav>
   </div>
 
-  <div id="sheet" class="sheet hidden">
-    <div class="sheet-handle"></div>
-    <div id="sheet-content"></div>
-  </div>
-  <div id="backdrop" class="backdrop hidden"></div>
+  <!-- Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(()=>{});
+      });
+    }
+  </script>
 </body>
 </html>
