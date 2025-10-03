@@ -1,5 +1,57 @@
 // assets/js/auth.js
 window.Auth = (function(){
+  // Стартовый экран: выбор — инвайт или вход
+  function openStart(){
+    UI.sheet(`
+      <div class="vstack">
+        <div class="section-title">Добро пожаловать в MishpuchaTech</div>
+        <div class="card vstack">
+          <div class="section-title">Регистрация по инвайту</div>
+          <input id="invite_code" class="input" placeholder="Инвайт-код (например, 2025)" inputmode="numeric">
+          <button class="btn" onclick="Auth.checkInviteAndRegister()">Продолжить</button>
+          <div class="small muted">Регистрация доступна только по приглашению.</div>
+        </div>
+
+        <div class="card vstack">
+          <div class="section-title">Уже есть аккаунт?</div>
+          <button class="btn ghost" onclick="Auth.openLogin()">Войти по почте и паролю</button>
+        </div>
+      </div>
+    `);
+  }
+
+  // Проверяем код инвайта (локально или через БД) и открываем форму регистрации
+  async function checkInviteAndRegister(){
+    const code = val('invite_code');
+    if(!code){ alert('Введите код приглашения'); return; }
+
+    // 1) локальный вариант (как в твоём прототипе — DB.invites)
+    const localOk = Array.isArray(window.DB?.invites) && window.DB.invites.includes(code);
+
+    // 2) если хочешь через Supabase (таблица invites) — раскомментируй:
+    // let remoteOk = false;
+    // try{
+    //   const { data, error } = await window.supabase
+    //     .from('invites')
+    //     .select('code, expires_at, max_uses, used_count')
+    //     .eq('code', code)
+    //     .maybeSingle();
+    //   if(!error && data){
+    //     const notExpired = !data.expires_at || new Date(data.expires_at) > new Date();
+    //     const hasUses = (data.used_count||0) < (data.max_uses||1);
+    //     remoteOk = notExpired && hasUses;
+    //   }
+    // }catch(e){ console.warn('invite check failed', e); }
+
+    if (localOk /*|| remoteOk*/) {
+      // можно сохранить флаг, что инвайт проверен (по желанию)
+      localStorage.setItem('mt_invited','1');
+      openRegister(); // открываем форму регистрации
+    } else {
+      alert('Неверный или недействительный инвайт');
+    }
+  }
+
   function openLogin(){
     UI.sheet(`
       <div class="vstack">
@@ -8,7 +60,7 @@ window.Auth = (function(){
         <input id="login_pass" class="input" type="password" placeholder="Пароль" autocomplete="current-password">
         <div class="hstack">
           <button class="btn" onclick="Auth.doLogin()">Войти</button>
-          <button class="btn ghost" onclick="Auth.openRegister()">Регистрация</button>
+          <button class="btn ghost" onclick="Auth.openStart()">Назад</button>
         </div>
       </div>
     `);
@@ -24,16 +76,20 @@ window.Auth = (function(){
         <input id="r_first" class="input" placeholder="Имя">
         <input id="r_pat" class="input" placeholder="Отчество (необязательно)">
         <input id="r_dob" class="input" type="date" placeholder="Дата рождения">
-        <input id="r_city" class="input" placeholder="Город">
+        <input id="r_city" class="input" placeholder="Город (необязательно)">
         <div class="hstack">
           <button class="btn" onclick="Auth.doRegister()">Создать аккаунт</button>
-          <button class="btn ghost" onclick="Auth.openLogin()">У меня уже есть аккаунт</button>
+          <button class="btn ghost" onclick="Auth.openStart()">Назад</button>
         </div>
       </div>
     `);
   }
 
   async function doRegister(){
+    // на всякий случай — требуем, чтобы человек пришёл через инвайт
+    if (!localStorage.getItem('mt_invited')) {
+      alert('Регистрация доступна только по инвайту'); return;
+    }
     const email = val('r_email'), password = val('r_pass');
     const lastname = val('r_last'), firstname = val('r_first'), patronymic = val('r_pat');
     const dob = val('r_dob'), city = val('r_city');
@@ -41,7 +97,7 @@ window.Auth = (function(){
     try{
       await DBAPI.signUp({ email, password, lastname, firstname, patronymic, dob, city });
       UI.close();
-      await App.afterAuth(); // продолжим загрузку приложения
+      await App.afterAuth();
     }catch(e){ console.error(e); alert('Регистрация не удалась: '+(e?.message||e)); }
   }
 
@@ -57,5 +113,5 @@ window.Auth = (function(){
 
   function val(id){ return (document.getElementById(id)?.value||'').trim(); }
 
-  return { openLogin, openRegister, doLogin, doRegister };
+  return { openStart, openLogin, openRegister, doLogin, doRegister, checkInviteAndRegister };
 })();
