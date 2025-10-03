@@ -1,5 +1,5 @@
 // sw.js
-const CACHE_STATIC = 'mt-static-v3'; // ← обнови версию
+const CACHE_STATIC = 'mt-static-v4'; // ← обнови версию
 self.addEventListener('install', (e)=>{
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE_STATIC).then(cache => cache.addAll([
