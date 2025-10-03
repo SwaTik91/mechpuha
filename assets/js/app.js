@@ -54,11 +54,12 @@ window.addEventListener('load', async ()=>{
     if (session?.user) {
       await App.afterAuth();
     } else {
-      Auth.openLogin(); // показываем окно входа
+            Auth.openStart(); // показываем окно входа
     }
   } catch (e) {
     console.warn('Supabase init failed', e);
     alert('Нет подключения к базе. Проверьте настройки.');
+    Auth.openStart();
   }
 });
 
