@@ -105,43 +105,82 @@
 
   // --------- USERS ---------
   // Создание "черновика" родственника (без аккаунта)
-  async function addUserPlaceholder({ name, dob, city, is_deceased }){
-    requireInit();
-    const session = await getSession();
-    const uid = session?.user?.id;
-    if (!uid) throw new Error('Not authenticated');
+async function addUserPlaceholder({ name, dob, city, is_deceased }){
+  requireInit();
+  const session = await getSession();
+  const uid = session?.user?.id;
+  if (!uid) throw new Error('Not authenticated');
 
-    const payload = {
-      name: name || '(без имени)',
-      dob: dob || null,
-      city: city || null,
-      is_placeholder: true,
-      is_deceased: !!is_deceased,
-      created_by_auth: uid,
-      auth_id: null
-    };
+  const payload = {
+    name: name || '(без имени)',
+    dob: dob || null,
+    city: city || null,
+    is_placeholder: true,
+    is_deceased: !!is_deceased,
+    created_by_auth: uid,
+    auth_id: null
+  };
+
+  try{
     const { data, error } = await supabase.from('users').insert(payload).select().single();
     if (error) throw error;
     return data;
+  }catch(e){
+    // если у таблицы снова нет дефолта на id — пробуем ещё раз с явным UUID
+    if (String(e.message||e).toLowerCase().includes('null value in column "id"')) {
+      const id = (crypto && crypto.randomUUID) ? crypto.randomUUID() :
+                 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c=>{
+                    const r = Math.random()*16|0, v = c==='x'?r:(r&0x3|0x8); return v.toString(16);
+                 });
+      const { data, error } = await supabase.from('users')
+        .insert({ id, ...payload })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    }
+    throw e;
   }
+}
 
-  async function addUser({ id, name, dob, city }){
-    // оставляем как "полный" профиль (редко нужен напрямую)
-    requireInit();
-    const session = await getSession();
-    const uid = session?.user?.id;
-    if (!uid) throw new Error('Not authenticated');
 
-    const payload = {
-      auth_id: uid,
-      name, dob: dob || null, city: city || null,
-      is_placeholder: false, is_deceased: false,
-      created_by_auth: uid
-    };
+async function addUser({ id, name, dob, city }){
+  requireInit();
+  const session = await getSession();
+  const uid = session?.user?.id;
+  if (!uid) throw new Error('Not authenticated');
+
+  const payload = {
+    auth_id: uid,
+    name,
+    dob: dob || null,
+    city: city || null,
+    is_placeholder: false,
+    is_deceased: false,
+    created_by_auth: uid
+  };
+
+  try{
     const { data, error } = await supabase.from('users').insert(payload).select().single();
     if (error) throw error;
     return data;
+  }catch(e){
+    if (String(e.message||e).toLowerCase().includes('null value in column "id"')) {
+      const gen = (crypto && crypto.randomUUID) ? crypto.randomUUID() :
+                  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c=>{
+                    const r = Math.random()*16|0, v = c==='x'?r:(r&0x3|0x8); return v.toString(16);
+                  });
+      const { data, error } = await supabase.from('users')
+        .insert({ id: gen, ...payload })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    }
+    throw e;
   }
+}
+
 
   async function updateUser(id, patch){
     requireInit();
