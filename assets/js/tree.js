@@ -120,12 +120,22 @@ window.Tree = (function () {
   async function waitForLayout(el, tries = 30) {
     for (let i = 0; i < tries; i++) {
       const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) return;
+      if (r.width > 0 && r.height > 0) return true;
       await new Promise(r => requestAnimationFrame(r));
     }
     console.warn('treeContainer has zero size after wait');
+    return false;
   }
-
+function observeVisibility(el, onVisible) {
+  const io = new IntersectionObserver((entries) => {
+    const e = entries[0];
+    if (e && e.isIntersecting) {
+      io.disconnect();
+      requestAnimationFrame(() => onVisible && onVisible());
+    }
+  }, { root: null, threshold: 0.01 });
+  io.observe(el);
+}
   async function renderFamilyTree() {
     const container = document.getElementById('treeContainer');
     if (!container) return;
@@ -134,7 +144,11 @@ window.Tree = (function () {
     if (!container.style.height) container.style.height = '76vh';
 
     // Ждём, пока контейнер реально станет ненулевого размера
-    await waitForLayout(container);
+    const ready = await waitForLayout(container);
+    if (!ready) {
+      observeVisibility(container, () => renderFamilyTree());
+      return;
+    }
 
     const data = buildBalkanData(DB); // { nodes, num2id, rootNum, roots }
 
@@ -157,7 +171,7 @@ window.Tree = (function () {
     }
 
     // Отключаем внутренний lazy-loading — рисуем сразу, даже если таб скрыт
-    if (window.FamilyTree) window.FamilyTree.LAZY_LOADING = false;
+    if (window.FamilyTree) window.FamilyTree.LAZY_LOADING = true;
 
     if (!family) {
       family = new window.FamilyTree(container, {
@@ -179,10 +193,16 @@ window.Tree = (function () {
 
     // показать всё и сфокусироваться на тебе
     setTimeout(() => {
-      try { family.fit(); } catch (e) {}
-      const root = Number.isFinite(data.rootNum) ? data.rootNum : null;
-      if (root) {
-        try { family.center(root); family.select(root); } catch (e) {}
+      const w = container.offsetWidth, h = container.offsetHeight;
+      const run = () => {
+        try { family.fit(); } catch (e) {}
+        const root = Number.isFinite(data.rootNum) ? data.rootNum : null;
+        if (root) { try { family.center(root); family.select(root); } catch (e) {} }
+      };
+      if (w > 0 && h > 0) {
+        run();
+      } else {
+        observeVisibility(container, run);
       }
     }, 0);
   }
@@ -210,7 +230,10 @@ window.Tree = (function () {
         for (const n of ns) { if (!keep.has(n)) { keep.add(n); q.push(n); } }
       }
     }
-    const usersList = keep ? (DB.users || []).filter(u => keep.has(u.id)) : (DB.users || []);
+    const usersAll = (DB.users || []);
+    const usersList = (keep && usersAll.some(u => keep.has(u.id)))
+      ? usersAll.filter(u => keep.has(u.id))
+      : usersAll;
 
     // 1) Маппинг строковых id -> числовых id (требование FamilyTreeJS)
     const id2num = new Map(), num2id = new Map();
@@ -220,7 +243,7 @@ window.Tree = (function () {
     }
     // учтём id из rels, если там есть узлы, которых нет в users
     for (const r of (DB.rels || [])) {
-      if (keep && (!keep.has(r.a) || !keep.has(r.b))) continue;
+  
       if (!id2num.has(r.a)) { id2num.set(r.a, seq); num2id.set(seq, r.a); seq++; }
       if (!id2num.has(r.b)) { id2num.set(r.b, seq); num2id.set(seq, r.b); seq++; }
     }
