@@ -229,10 +229,15 @@ function observeVisibility(el, onVisible) {
         for (const n of ns) { if (!keep.has(n)) { keep.add(n); q.push(n); } }
       }
     }
-    const usersAll = (DB.users || []);
-    const usersList = (keep && usersAll.some(u => keep.has(u.id)))
-      ? usersAll.filter(u => keep.has(u.id))
-      : usersAll;
+const usersAll = (DB.users || []);
+let usersList;
+if (keep && usersAll.some(u => keep.has(u.id))) {
+  usersList = usersAll.filter(u => keep.has(u.id));
+} else {
+  // фоллбэк: только текущий пользователь
+  usersList = usersAll.filter(u => u.id === DB.currentUserId);
+}
+
 
     // 1) Маппинг строковых id -> числовых id (требование FamilyTreeJS)
     const id2num = new Map(), num2id = new Map();
