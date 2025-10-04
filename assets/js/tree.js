@@ -126,6 +126,7 @@ window.Tree = (function () {
     console.warn('treeContainer has zero size after wait');
     return false;
   }
+  
 function observeVisibility(el, onVisible) {
   const io = new IntersectionObserver((entries) => {
     const e = entries[0];
@@ -181,6 +182,7 @@ function observeVisibility(el, onVisible) {
         minZoom: .5, maxZoom: 2, scaleInitial: window.innerWidth < 768 ? 0.8 : 1,
         siblingSeparation: 90, levelSeparation: 80, subtreeSeparation: 110,
         nodes: data.nodes,
+        roots: (data.roots && data.roots.length) ? data.roots : undefined,
         // roots не используем (показываем всю компоненту), фокус делаем вручную
         nodeMouseClick: (args) => { 
           if (args && args.node) openProfile(data.num2id.get(args.node.id)); 
@@ -194,16 +196,13 @@ function observeVisibility(el, onVisible) {
     // показать всё и сфокусироваться на тебе
     setTimeout(() => {
       const w = container.offsetWidth, h = container.offsetHeight;
+      const root = Number.isFinite(data.rootNum) ? data.rootNum : null;
       const run = () => {
-        try { family.fit(); } catch (e) {}
-        const root = Number.isFinite(data.rootNum) ? data.rootNum : null;
-        if (root) { try { family.center(root); family.select(root); } catch (e) {} }
+        try { family.fit(); } catch(e) {}
+        if (root) { try { family.center(root); family.select(root); } catch(e) {} }
       };
-      if (w > 0 && h > 0) {
-        run();
-      } else {
-        observeVisibility(container, run);
-      }
+      if (w > 0 && h > 0) run();
+      else observeVisibility(container, run);
     }, 0);
   }
 
