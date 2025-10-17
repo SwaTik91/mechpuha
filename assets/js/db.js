@@ -1,233 +1,71 @@
-// assets/js/db.js
-(function(){
-  let supabase = null;
+/*
+  Minimal DB layer for the MVP: each user has a private "garden" (persons + person_rels)
+  Requirements on DB (run once in Supabase SQL):
+    - tables: public.persons, public.person_rels
+    - RPC: public.ensure_me(p_name text default 'Я') returns uuid
+    - RLS: owner_auth = auth.uid() on both tables
 
-  function requireInit(){
-    if(!supabase) throw new Error('Supabase is not initialized');
-  }
+  Usage after auth:
+    DB.currentUserId = await DBAPI.ensureMe('Ваше имя');
+    await DBAPI.loadAll();
+    Tree.page();
+*/
 
-  async function init({ url, anonKey }){
-    if(!url || !anonKey) throw new Error('Missing Supabase config');
-    supabase = window.supabase.createClient(url, anonKey);
-    window.supabase = supabase;
-    return true;
-  }
+export const DBAPI = {
+  // Ensure "me" person exists for the current auth user and return its UUID
+  async ensureMe(name = 'Я') {
+    const { data, error } = await supabase.rpc('ensure_me', { p_name: name });
+    if (error) throw error;
+    return data; // uuid
+  },
 
-  // --------- AUTH ---------
-  async function signUp({ email, password, lastname, firstname, patronymic, dob, city }){
-    requireInit();
-    // 1) создаём аккаунт
-    const { data: auth, error: e1 } = await supabase.auth.signUp({ email, password });
-    if (e1) throw e1;
-    const uid = auth.user?.id;
-    if (!uid) throw new Error('No user id from auth.signUp');
+  // Load all private persons + relations into global DB {users, rels}
+  async loadAll() {
+    const [{ data: persons, error: e1 }, { data: rels, error: e2 }] = await Promise.all([
+      supabase.from('persons').select('*').order('created_at', { ascending: true }),
+      supabase.from('person_rels').select('*')
+    ]);
+    if (e1) throw e1; if (e2) throw e2;
+    window.DB = window.DB || {};
+    DB.users = persons || [];
+    // Normalized rels for tree.js ({a,b,type})
+    DB.rels = (rels || []).map(r => ({ a: r.a, b: r.b, type: r.rel_type }));
+    return DB;
+  },
 
-    const name = [lastname, firstname, patronymic].filter(Boolean).join(' ').trim() || email;
-
-    // 2) пробуем "забрать" существующий черновик по (name+dob)
-    let claimedId = null;
-    try{
-      const { data, error } = await supabase.rpc('claim_placeholder', { p_name: name, p_dob: dob || null });
-      if (error) console.warn('claim_placeholder error', error);
-      if (data) claimedId = data;
-    }catch(e){ console.warn('claim_placeholder failed', e); }
-
-    if (claimedId) {
-      // обновим данные карточки (auth_id уже проставлен на стороне БД)
-      const patch = { name, dob: dob || null, city: city || null, is_placeholder: false };
-      const { data, error } = await supabase.from('users').update(patch).eq('id', claimedId).select().single();
-      if (error) throw error;
-      return { id: claimedId, email };
-    }
-
-    // 3) черновик не найден → создаём полноценный профиль, привязанный к аккаунту
+  // Create a person in my private garden
+  async addPerson(p) {
     const payload = {
-      auth_id: uid,
-      name,
-      dob: dob || null,
-      city: city || null,
-      is_placeholder: false,
-      is_deceased: false,
-      created_by_auth: uid
+      name: p.name,
+      dob: p.dob || null,
+      city: p.city || null,
+      is_deceased: !!p.is_deceased
     };
-    const { data: row, error: e2 } = await supabase.from('users').insert(payload).select().single();
-    if (e2) throw e2;
-    return { id: row.id, email };
-  }
-
-  async function signIn({ email, password }){
-    requireInit();
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    return data.session || null;
-  }
-
-  async function signOut(){
-    requireInit();
-    await supabase.auth.signOut();
-    return true;
-  }
-
-  async function getSession(){
-    requireInit();
-    const { data, error } = await supabase.auth.getSession();
-    if (error) throw error;
-    return data.session || null;
-  }
-
-  async function updatePassword({ oldPassword, newPassword, email }){
-    requireInit();
-    if (email && oldPassword) {
-      const { error: e1 } = await supabase.auth.signInWithPassword({ email, password: oldPassword });
-      if (e1) throw e1;
-    }
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) throw error;
-    return true;
-  }
-
-  // --------- DATA LOADING ---------
-  async function loadAll(){
-    requireInit();
-    const { data: users, error: e1 } = await supabase.from('users').select('*').order('created_at', { ascending: true });
-    if (e1) throw e1;
-    const { data: rels, error: e2 }  = await supabase.from('rels').select('*').order('id', { ascending: true });
-    if (e2) throw e2;
-    return { users, rels };
-  }
-
-  async function reloadIntoWindowDB(){
-    const { users, rels } = await loadAll();
-    window.DB.users = users || [];
-    window.DB.rels  = rels  || [];
-    return true;
-  }
-
-  // --------- USERS ---------
-  // Создание "черновика" родственника (без аккаунта)
-async function addUserPlaceholder({ name, dob, city, is_deceased }){
-  requireInit();
-  const session = await getSession();
-  const uid = session?.user?.id;
-  if (!uid) throw new Error('Not authenticated');
-
-  const payload = {
-    name: name || '(без имени)',
-    dob: dob || null,
-    city: city || null,
-    is_placeholder: true,
-    is_deceased: !!is_deceased,
-    created_by_auth: uid,
-    auth_id: null
-  };
-
-  try{
-    const { data, error } = await supabase.from('users').insert(payload).select().single();
-    if (error) throw error;
-    return data;
-  }catch(e){
-    // если у таблицы снова нет дефолта на id — пробуем ещё раз с явным UUID
-    if (String(e.message||e).toLowerCase().includes('null value in column "id"')) {
-      const id = (crypto && crypto.randomUUID) ? crypto.randomUUID() :
-                 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c=>{
-                    const r = Math.random()*16|0, v = c==='x'?r:(r&0x3|0x8); return v.toString(16);
-                 });
-      const { data, error } = await supabase.from('users')
-        .insert({ id, ...payload })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    }
-    throw e;
-  }
-}
-
-
-async function addUser({ id, name, dob, city }){
-  requireInit();
-  const session = await getSession();
-  const uid = session?.user?.id;
-  if (!uid) throw new Error('Not authenticated');
-
-  const payload = {
-    auth_id: uid,
-    name,
-    dob: dob || null,
-    city: city || null,
-    is_placeholder: false,
-    is_deceased: false,
-    created_by_auth: uid
-  };
-
-  try{
-    const { data, error } = await supabase.from('users').insert(payload).select().single();
-    if (error) throw error;
-    return data;
-  }catch(e){
-    if (String(e.message||e).toLowerCase().includes('null value in column "id"')) {
-      const gen = (crypto && crypto.randomUUID) ? crypto.randomUUID() :
-                  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c=>{
-                    const r = Math.random()*16|0, v = c==='x'?r:(r&0x3|0x8); return v.toString(16);
-                  });
-      const { data, error } = await supabase.from('users')
-        .insert({ id: gen, ...payload })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    }
-    throw e;
-  }
-}
-
-
-  async function updateUser(id, patch){
-    requireInit();
-    const { data, error } = await supabase.from('users').update(patch).eq('id', id).select().single();
-    if (error) throw error;
-    return data;
-  }
-
-  async function findUserExact(name, dob){
-    requireInit();
-    let q = supabase.from('users').select('*').eq('name', name);
-    if (dob) q = q.eq('dob', dob);
-    const { data, error } = await q.maybeSingle();
-    if (error) throw error;
-    return data || null;
-  }
-
-  async function searchUsers(query){
-    requireInit();
-    if (!query) return [];
-    const { data, error } = await supabase.from('users')
+    const { data, error } = await supabase
+      .from('persons')
+      .insert(payload)
       .select('*')
-      .ilike('name', `%${query}%`)
-      .limit(25);
+      .single();
     if (error) throw error;
-    return data || [];
-  }
+    return data; // full row from persons
+  },
 
-  // --------- RELS ---------
-  async function addRel({ type, a, b }){
-    requireInit();
-    const { data, error } = await supabase.from('rels').insert({ type, a, b }).select().single();
+  // Create a relation in my private garden
+  async addRel(row) {
+    const { error } = await supabase
+      .from('person_rels')
+      .insert({ a: row.a, b: row.b, rel_type: row.type });
     if (error) throw error;
-    return data;
-  }
+  },
 
-  async function deleteRel(id){
-    requireInit();
-    const { error } = await supabase.from('rels').delete().eq('id', id);
+  async removeRel(row) {
+    const { error } = await supabase
+      .from('person_rels')
+      .delete()
+      .match({ a: row.a, b: row.b, rel_type: row.type });
     if (error) throw error;
-    return true;
-  }
+  },
 
-  window.DBAPI = {
-    init, getSession, signUp, signIn, signOut, updatePassword,
-    loadAll, reloadIntoWindowDB,
-    addUser, addUserPlaceholder, updateUser, findUserExact, searchUsers,
-    addRel, deleteRel
-  };
-})();
+  // Back-compat alias
+  async reloadIntoWindowDB() { return this.loadAll(); },
+};
