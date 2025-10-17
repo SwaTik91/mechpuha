@@ -1,41 +1,71 @@
 /*
-  Minimal DB layer for the MVP: each user has a private "garden" (persons + person_rels)
-  Requirements on DB (run once in Supabase SQL):
-    - tables: public.persons, public.person_rels
-    - RPC: public.ensure_me(p_name text default 'Я') returns uuid
-    - RLS: owner_auth = auth.uid() on both tables
+  assets/js/db.js — версия для MVP (каждый пользователь видит только своё древо)
 
-  Usage after auth:
-    DB.currentUserId = await DBAPI.ensureMe('Ваше имя');
-    await DBAPI.loadAll();
-    Tree.page();
+  Требования в Supabase:
+    - таблица public.persons (
+        id uuid primary key default gen_random_uuid(),
+        owner_auth uuid references auth.users(id) on delete cascade,
+        name text,
+        dob date,
+        city text,
+        is_deceased boolean default false,
+        created_at timestamp default now()
+      )
+
+    - таблица public.person_rels (
+        id uuid primary key default gen_random_uuid(),
+        owner_auth uuid references auth.users(id) on delete cascade,
+        a uuid references public.persons(id) on delete cascade,
+        b uuid references public.persons(id) on delete cascade,
+        rel_type text,
+        created_at timestamp default now()
+      )
+
+    - функция ensure_me(p_name text default 'Я') returns uuid
+      создаёт или возвращает «своего» пользователя:
+        select id from persons where owner_auth = auth.uid() limit 1;
+        если нет → insert into persons(name, owner_auth) values (p_name, auth.uid()) returning id;
+
+    - RLS:
+        enable row level security;
+        policy select_own on persons for select using (owner_auth = auth.uid());
+        policy modify_own on persons for all using (owner_auth = auth.uid());
+        аналогично для person_rels
 */
-// Supabase client (UMD): создаём один раз
+
+console.log('[db.js] init');
+
+// создаём клиент Supabase (UMD версия)
 const sb = window.supabase.createClient(window.__SUPA_URL__, window.__SUPA_ANON__);
 
-export const DBAPI = {
-  // Ensure "me" person exists for the current auth user and return its UUID
+// глобальный объект DBAPI
+window.DBAPI = {
+
+  // гарантирует, что у текущего пользователя есть запись «Я»
   async ensureMe(name = 'Я') {
-    const { data, error } = await supabase.rpc('ensure_me', { p_name: name });
+    const { data, error } = await sb.rpc('ensure_me', { p_name: name });
     if (error) throw error;
+    console.log('[ensureMe] got id', data);
     return data; // uuid
   },
 
-  // Load all private persons + relations into global DB {users, rels}
+  // загружает всех людей и связи из моей приватной области
   async loadAll() {
     const [{ data: persons, error: e1 }, { data: rels, error: e2 }] = await Promise.all([
-      supabase.from('persons').select('*').order('created_at', { ascending: true }),
-      supabase.from('person_rels').select('*')
+      sb.from('persons').select('*').order('created_at', { ascending: true }),
+      sb.from('person_rels').select('*')
     ]);
-    if (e1) throw e1; if (e2) throw e2;
+    if (e1) throw e1;
+    if (e2) throw e2;
+
     window.DB = window.DB || {};
     DB.users = persons || [];
-    // Normalized rels for tree.js ({a,b,type})
-    DB.rels = (rels || []).map(r => ({ a: r.a, b: r.b, type: r.rel_type }));
+    DB.rels  = (rels || []).map(r => ({ a: r.a, b: r.b, type: r.rel_type }));
+    console.log('[DBAPI.loadAll]', DB.users.length, 'users /', DB.rels.length, 'rels');
     return DB;
   },
 
-  // Create a person in my private garden
+  // добавляет нового человека
   async addPerson(p) {
     const payload = {
       name: p.name,
@@ -43,31 +73,37 @@ export const DBAPI = {
       city: p.city || null,
       is_deceased: !!p.is_deceased
     };
-    const { data, error } = await supabase
-      .from('persons')
+    const { data, error } = await sb.from('persons')
       .insert(payload)
       .select('*')
       .single();
     if (error) throw error;
-    return data; // full row from persons
+    console.log('[DBAPI.addPerson]', data);
+    return data;
   },
 
-  // Create a relation in my private garden
+  // добавляет связь
   async addRel(row) {
-    const { error } = await supabase
-      .from('person_rels')
+    const { error } = await sb.from('person_rels')
       .insert({ a: row.a, b: row.b, rel_type: row.type });
     if (error) throw error;
+    console.log('[DBAPI.addRel]', row);
   },
 
+  // удаляет связь
   async removeRel(row) {
-    const { error } = await supabase
-      .from('person_rels')
+    const { error } = await sb.from('person_rels')
       .delete()
       .match({ a: row.a, b: row.b, rel_type: row.type });
     if (error) throw error;
+    console.log('[DBAPI.removeRel]', row);
   },
 
-  // Back-compat alias
-  async reloadIntoWindowDB() { return this.loadAll(); },
+  // перезагрузка в window.DB
+  async reloadIntoWindowDB() {
+    return this.loadAll();
+  },
 };
+
+// для отладки можно вызвать из консоли:
+// DBAPI.ensureMe().then(id=>{DB.currentUserId=id;DBAPI.loadAll();})
