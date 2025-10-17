@@ -10,6 +10,8 @@
     await DBAPI.loadAll();
     Tree.page();
 */
+// Supabase client (UMD): создаём один раз
+const sb = window.supabase.createClient(window.__SUPA_URL__, window.__SUPA_ANON__);
 
 export const DBAPI = {
   // Ensure "me" person exists for the current auth user and return its UUID
