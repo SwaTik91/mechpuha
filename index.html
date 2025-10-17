@@ -32,7 +32,24 @@
   </script>
 
   <!-- База/утилиты -->
-  <script defer src="assets/js/db.js?v=20251004"></script>
+  <script defer src="assets/js/db.js?v=20251008"></script>
+  <script>
+  // есть клиент (у тебя уже true), на всякий — создадим, если нет
+  window.__sb__ = window.__sb__ || window.supabase.createClient(
+    window.__SUPA_URL__, window.__SUPA_ANON__
+  );
+
+  // добиваем недостающий метод
+  window.DBAPI = window.DBAPI || {};
+  if (!DBAPI.getSession) {
+    DBAPI.getSession = async function () {
+      const { data, error } = await __sb__.auth.getSession();
+      if (error) throw error;
+      return data; // { session, user }
+    };
+    console.log('[polyfill] DBAPI.getSession добавлен');
+  }
+</script>
   <script defer src="assets/js/ui.js?v=20251004"></script>
   <!-- мок-данные на всякий случай (офлайн демо) -->
   <script defer src="assets/js/data.js?v=20251004"></script>
