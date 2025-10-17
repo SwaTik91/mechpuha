@@ -1,51 +1,52 @@
 /*
-  assets/js/db.js  —  простая версия для MVP-древа (каждый пользователь видит только своих людей)
+  assets/js/db.js — MVP: личное древо (persons + person_rels) и обёртки Auth.
 
-  Требования в Supabase:
-    ▪ таблица public.persons (
-         id uuid primary key default gen_random_uuid(),
-         owner_auth uuid references auth.users(id) on delete cascade,
-         name text,
-         dob date,
-         city text,
-         is_deceased boolean default false,
-         created_at timestamp default now()
-       );
-
-    ▪ таблица public.person_rels (
-         id uuid primary key default gen_random_uuid(),
-         owner_auth uuid references auth.users(id) on delete cascade,
-         a uuid references public.persons(id) on delete cascade,
-         b uuid references public.persons(id) on delete cascade,
-         rel_type text,
-         created_at timestamp default now()
-       );
-
-    ▪ функция ensure_me(p_name text default 'Я') returns uuid
-         возвращает id существующего профиля с owner_auth = auth.uid(),
-         либо создаёт новую запись persons(name, owner_auth).
-
-    ▪ RLS:
-         enable row level security;
-         policy select_own on persons for select using (owner_auth = auth.uid());
-         policy modify_own on persons for all using (owner_auth = auth.uid());
-         (аналогично для person_rels)
+  Требуется в Supabase:
+    • public.persons, public.person_rels (RLS owner_auth = auth.uid())
+    • RPC public.ensure_me(p_name text default 'Я') returns uuid
 */
 
 console.log('[db.js] init');
 
-// ─────────────────────────────────────────────────────────────
-// Инициализация Supabase-клиента (UMD-версия библиотеки)
+// ── Supabase UMD клиент
 if (!window.supabase) {
-  console.error('[db.js] Supabase SDK не найден — проверь <script src=\"@supabase/supabase-js\">');
+  console.error('[db.js] Supabase SDK не найден — проверь <script src="@supabase/supabase-js">');
 }
 const sb = window.supabase.createClient(window.__SUPA_URL__, window.__SUPA_ANON__);
+window.__sb__ = sb; // на всякий для отладки из консоли
 
-// ─────────────────────────────────────────────────────────────
-// Глобальный объект DBAPI (без export / import)
+// ── Глобальный API
 window.DBAPI = {
+  // ---------- AUTH (совместимо со старым auth.js) ----------
+  async signUp(emailOrObj, passwordMaybe) {
+    const email = typeof emailOrObj === 'string' ? emailOrObj : emailOrObj?.email;
+    const password = typeof emailOrObj === 'string' ? passwordMaybe : emailOrObj?.password;
+    const { data, error } = await sb.auth.signUp({ email, password });
+    if (error) throw error;
+    return data; // { user, session }
+  },
 
-  // гарантирует наличие собственного профиля «Я»
+  async signIn(emailOrObj, passwordMaybe) {
+    const email = typeof emailOrObj === 'string' ? emailOrObj : emailOrObj?.email;
+    const password = typeof emailOrObj === 'string' ? passwordMaybe : emailOrObj?.password;
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return data;
+  },
+
+  async signOut() {
+    const { error } = await sb.auth.signOut();
+    if (error) throw error;
+  },
+
+  async getUser() {
+    const { data, error } = await sb.auth.getUser();
+    if (error) throw error;
+    return data?.user || null;
+  },
+  // ----------------------------------------------------------
+
+  // гарантирует наличие собственной персоны «Я» и возвращает её uuid
   async ensureMe(name = 'Я') {
     const { data, error } = await sb.rpc('ensure_me', { p_name: name });
     if (error) throw error;
@@ -53,7 +54,7 @@ window.DBAPI = {
     return data; // uuid
   },
 
-  // загрузка всех персон и связей (только своих)
+  // загрузка всех моих персон и связей
   async loadAll() {
     const [{ data: persons, error: e1 }, { data: rels, error: e2 }] = await Promise.all([
       sb.from('persons').select('*').order('created_at', { ascending: true }),
@@ -70,7 +71,7 @@ window.DBAPI = {
     return DB;
   },
 
-  // создание человека
+  // создание персоны
   async addPerson(p) {
     const payload = {
       name: p.name,
@@ -107,12 +108,9 @@ window.DBAPI = {
     console.log('[DBAPI.removeRel]', row);
   },
 
-  // перезагрузка в window.DB
-  async reloadIntoWindowDB() {
-    return this.loadAll();
-  },
+  // бэк-компат alias
+  async reloadIntoWindowDB() { return this.loadAll(); },
 };
 
-// ─────────────────────────────────────────────────────────────
-// отладка: можно в консоли выполнить
-// DBAPI.ensureMe('Я').then(id=>{DB.currentUserId=id;DBAPI.loadAll();})
+// Подсказка для быстрого старта из консоли:
+// DBAPI.signIn('mail@example.com','pass').then(()=>DBAPI.ensureMe('Я')).then(id=>{DB.currentUserId=id; return DBAPI.loadAll();}).then(()=>Tree.page());
