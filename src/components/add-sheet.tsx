@@ -24,6 +24,9 @@ type AddSheetProps = {
   open: boolean;
   personName: string;
   kind: RelativeKind | null;
+  mode: "choose" | "add" | "edit";
+  unavailableKinds?: RelativeKind[];
+  initialCard?: { name: string; clan: string; origin: string };
   saving?: boolean;
   error?: string | null;
   onClose: () => void;
@@ -31,18 +34,25 @@ type AddSheetProps = {
     card: { name: string; clan: string; origin: string },
     kind: RelativeKind
   ) => void;
+  onEditSave: (card: { name: string; clan: string; origin: string }) => void;
   onKindChange?: (kind: RelativeKind) => void;
+  onEdit?: () => void;
 };
 
 export function AddSheet({
   open,
   personName,
   kind,
+  mode,
+  unavailableKinds = [],
+  initialCard,
   saving,
   error,
   onClose,
   onSave,
+  onEditSave,
   onKindChange,
+  onEdit,
 }: AddSheetProps) {
   const [name, setName] = useState("");
   const [clan, setClan] = useState("");
@@ -50,25 +60,37 @@ export function AddSheet({
   const [childKind, setChildKind] = useState<"son" | "daughter">("son");
 
   useEffect(() => {
-    if (open) {
-      setName("");
-      setClan("");
-      setOrigin("");
+    if (!open) return;
+    if (mode === "edit" && initialCard) {
+      setName(initialCard.name);
+      setClan(initialCard.clan);
+      setOrigin(initialCard.origin);
       setChildKind("son");
+      return;
     }
-  }, [open, kind, personName]);
+    setName("");
+    setClan("");
+    setOrigin("");
+    setChildKind("son");
+  }, [open, kind, personName, mode, initialCard]);
 
   if (!open) return null;
 
   const resolvedKind =
     kind === "son" || kind === "daughter" ? childKind : kind;
   const title =
-    kind !== null
-      ? `${KIND_TITLE[resolvedKind ?? "son"]} ${toGenitive(personName)}`
-      : `Добавить к ${toDative(personName)}`;
+    mode === "edit"
+      ? `Править: ${personName}`
+      : kind !== null
+        ? `${KIND_TITLE[resolvedKind ?? "son"]} ${toGenitive(personName)}`
+        : `Добавить к ${toDative(personName)}`;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (mode === "edit") {
+      onEditSave({ name, clan, origin });
+      return;
+    }
     if (!resolvedKind) return;
     onSave({ name, clan, origin }, resolvedKind);
   }
@@ -83,24 +105,35 @@ export function AddSheet({
       >
         <h2 id="add-sheet-title" className="sheet__title">{title}</h2>
 
-        {kind === null && onKindChange && (
-          <div className="sheet__kinds">
-            {KIND_OPTIONS.map(({ kind: k, label }) => (
-              <button
-                key={k}
-                type="button"
-                className="sheet__kind-btn"
-                onClick={() => onKindChange(k)}
-              >
-                {label}
+        {mode === "choose" && onKindChange && (
+          <>
+            {onEdit && (
+              <button type="button" className="sheet__kind-btn sheet__kind-btn--edit" onClick={onEdit}>
+                Править
               </button>
-            ))}
-          </div>
+            )}
+            <div className="sheet__kinds">
+              {KIND_OPTIONS.map(({ kind: k, label }) => {
+                const unavailable = unavailableKinds.includes(k);
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    className="sheet__kind-btn"
+                    disabled={unavailable}
+                    onClick={() => onKindChange(k)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </>
         )}
 
-        {kind !== null && (
+        {(mode === "add" || mode === "edit") && (
           <form onSubmit={handleSubmit}>
-            {(kind === "son" || kind === "daughter") && (
+            {mode === "add" && (kind === "son" || kind === "daughter") && (
               <div className="sheet__child-kind">
                 <label>
                   <input

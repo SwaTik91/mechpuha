@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 
 const SESSION_COOKIE = "mishpucha_session";
+const SESSION_MAX_AGE_SEC = 14 * 24 * 60 * 60;
 
 export async function setSessionCookie(token: string): Promise<void> {
   const jar = await cookies();
@@ -8,6 +9,8 @@ export async function setSessionCookie(token: string): Promise<void> {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
+    maxAge: SESSION_MAX_AGE_SEC,
+    secure: process.env.NODE_ENV === "production",
   });
 }
 

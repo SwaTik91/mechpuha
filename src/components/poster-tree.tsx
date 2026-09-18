@@ -36,7 +36,7 @@ function PosterRow({
 }
 
 export function PosterTree({ graph, rootId }: PosterTreeProps) {
-  const { ancestors, root, descendants } = layoutGenerations(graph, rootId);
+  const { ancestors, rootLevel, descendants } = layoutGenerations(graph, rootId);
 
   return (
     <div className="generation-tree poster-tree">
@@ -46,7 +46,7 @@ export function PosterTree({ graph, rootId }: PosterTreeProps) {
           <div className="poster-connector" aria-hidden="true" />
         </div>
       ))}
-      <PosterRow graph={graph} ids={[root]} root />
+      <PosterRow graph={graph} ids={rootLevel} root />
       {descendants.map((level, i) => (
         <div key={`d-${i}`} className="poster-level">
           <div className="poster-connector" aria-hidden="true" />

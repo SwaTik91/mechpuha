@@ -21,12 +21,17 @@ describe("addRelative", () => {
     expect(() => addRelative(g, "p-david", "spouse", { name: "Другая" })).toThrowError(/SPOUSE_EXISTS/);
   });
 
-  it("adds a son so the new person is the child", () => {
+  it("adds a son so the new person is the child with parent role", () => {
     let g = davidGraph();
     g = addRelative(g, "p-david", "son", { name: "Ноах" });
     const child = g.persons.find((p) => p.name === "Ноах");
     expect(g.relations).toContainEqual(
-      expect.objectContaining({ type: "parent", parentId: "p-david", childId: child!.id })
+      expect.objectContaining({
+        type: "parent",
+        parentId: "p-david",
+        childId: child!.id,
+        role: "parent",
+      })
     );
   });
 

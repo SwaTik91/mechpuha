@@ -64,9 +64,9 @@ export function linkParent(
   graph: FamilyGraph,
   parentId: PersonId,
   childId: PersonId,
-  role: "father" | "mother"
+  role: "father" | "mother" | "parent"
 ): FamilyGraph {
-  if (hasParentRole(graph, childId, role)) {
+  if (role !== "parent" && hasParentRole(graph, childId, role)) {
     throw new DomainError(role === "father" ? "FATHER_EXISTS" : "MOTHER_EXISTS");
   }
   if (isAncestor(graph, parentId, childId)) {
@@ -121,6 +121,6 @@ export function addRelative(
     }
     case "son":
     case "daughter":
-      return linkParent(next, fromId, newPerson.id, "father");
+      return linkParent(next, fromId, newPerson.id, "parent");
   }
 }

@@ -16,12 +16,41 @@ function getChildren(graph: FamilyGraph, personId: PersonId): PersonId[] {
     .map((r) => r.childId);
 }
 
+export function getSpouseId(graph: FamilyGraph, personId: PersonId): PersonId | undefined {
+  for (const r of graph.relations) {
+    if (r.type !== "spouse") continue;
+    if (r.a === personId) return r.b;
+    if (r.b === personId) return r.a;
+  }
+  return undefined;
+}
+
+function expandWithSpouses(graph: FamilyGraph, ids: PersonId[]): PersonId[] {
+  const result: PersonId[] = [];
+  const seen = new Set<PersonId>();
+
+  for (const id of ids) {
+    if (!seen.has(id)) {
+      result.push(id);
+      seen.add(id);
+    }
+    const spouseId = getSpouseId(graph, id);
+    if (spouseId && !seen.has(spouseId)) {
+      result.push(spouseId);
+      seen.add(spouseId);
+    }
+  }
+
+  return result;
+}
+
 export function layoutGenerations(
   graph: FamilyGraph,
   rootId: PersonId
 ): {
   ancestors: PersonId[][];
   root: PersonId;
+  rootLevel: PersonId[];
   descendants: PersonId[][];
 } {
   const ancestors: PersonId[][] = [];
@@ -35,7 +64,7 @@ export function layoutGenerations(
       }
     }
     if (next.size === 0) break;
-    ancestors.push([...next]);
+    ancestors.push(expandWithSpouses(graph, [...next]));
     frontier = [...next];
   }
 
@@ -50,11 +79,16 @@ export function layoutGenerations(
       }
     }
     if (next.size === 0) break;
-    descendants.push([...next]);
+    descendants.push(expandWithSpouses(graph, [...next]));
     frontier = [...next];
   }
 
-  return { ancestors, root: rootId, descendants };
+  return {
+    ancestors,
+    root: rootId,
+    rootLevel: expandWithSpouses(graph, [rootId]),
+    descendants,
+  };
 }
 
 export function hasFather(graph: FamilyGraph, personId: PersonId): boolean {
@@ -63,6 +97,10 @@ export function hasFather(graph: FamilyGraph, personId: PersonId): boolean {
 
 export function hasMother(graph: FamilyGraph, personId: PersonId): boolean {
   return parentRelations(graph).some((r) => r.childId === personId && r.role === "mother");
+}
+
+export function hasSpouse(graph: FamilyGraph, personId: PersonId): boolean {
+  return getSpouseId(graph, personId) !== undefined;
 }
 
 export function hasChild(graph: FamilyGraph, personId: PersonId): boolean {

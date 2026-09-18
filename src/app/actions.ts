@@ -8,6 +8,7 @@ import {
   issueHelperKey,
   issueViewKey,
 } from "../domain/invites";
+import { updatePersonCard } from "../domain/person";
 import { addRelative } from "../domain/relations";
 import type {
   FamilyDocument,
@@ -106,6 +107,23 @@ export function makeActions(deps: ActionsDeps) {
       const doc = createFamily(userId, elder);
       deps.saveFamily(doc);
       return doc.id;
+    },
+
+    async updatePersonCardAction(
+      userId: UserId,
+      familyId: FamilyId,
+      personId: PersonId,
+      card: { name?: string; clan?: string; origin?: string }
+    ): Promise<void> {
+      const doc = deps.loadFamily(familyId);
+      if (!doc) {
+        throw new DomainError("FORBIDDEN");
+      }
+      if (!canEdit(doc, userId)) {
+        throw new DomainError("FORBIDDEN");
+      }
+      const graph = updatePersonCard(doc.graph, personId, card);
+      deps.saveFamily({ ...doc, graph });
     },
 
     async addRelativeAction(

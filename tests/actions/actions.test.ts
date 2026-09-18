@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { makeActions } from "../../src/app/actions";
+import { makeActions, type ActionsDeps } from "../../src/app/actions";
 import { createFamily } from "../../src/domain/family";
 import { issueViewKey } from "../../src/domain/invites";
 import { DomainError } from "../../src/domain/errors";
@@ -14,7 +14,7 @@ type MockStore = {
   keys: Map<string, FamilyKey>;
 };
 
-function makeMockDeps(store: MockStore, overrides: Partial<ReturnType<typeof makeMockDeps>> = {}) {
+function makeMockDeps(store: MockStore, overrides: Partial<ActionsDeps> = {}): ActionsDeps {
   const deps = {
     createUser: (email: string, passwordHash: string) => {
       const normalized = email.toLowerCase();

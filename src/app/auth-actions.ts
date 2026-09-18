@@ -18,17 +18,22 @@ async function requireUserId(): Promise<string> {
 export async function registerAction(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
+  const next = String(formData.get("next") ?? "");
 
   try {
     const userId = await actions.register(email, password);
     await setSessionCookie(signSession(userId, SESSION_SECRET));
   } catch (error) {
     if (error instanceof DomainError && error.code === "EMAIL_TAKEN") {
-      redirect("/register?error=email_taken");
+      const nextQuery = next ? `&next=${encodeURIComponent(next)}` : "";
+      redirect(`/register?error=email_taken${nextQuery}`);
     }
     throw error;
   }
 
+  if (next.startsWith("/") && !next.startsWith("//")) {
+    redirect(next);
+  }
   redirect("/");
 }
 
@@ -52,6 +57,32 @@ export async function loginAction(formData: FormData): Promise<void> {
     redirect(next);
   }
   redirect("/");
+}
+
+export async function updatePersonCardAction(
+  familyId: FamilyId,
+  personId: PersonId,
+  card: { name: string; clan: string; origin: string }
+): Promise<{ error?: string }> {
+  const userId = await requireUserId();
+
+  try {
+    await actions.updatePersonCardAction(userId, familyId, personId, card);
+    return {};
+  } catch (error) {
+    if (error instanceof DomainError) {
+      if (error.code === "NAME_REQUIRED") {
+        return { error: "Укажите имя" };
+      }
+      if (error.code === "PERSON_NOT_FOUND") {
+        return { error: "Человек не найден" };
+      }
+      if (error.code === "FORBIDDEN") {
+        redirect("/");
+      }
+    }
+    throw error;
+  }
 }
 
 export async function addRelativeAction(

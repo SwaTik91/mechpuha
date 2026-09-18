@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { layoutGenerations } from "../domain/layout";
+import { hasFather, hasMother, hasSpouse, layoutGenerations } from "../domain/layout";
 import type { FamilyDocument, PersonId, RelativeKind } from "../domain/types";
 import { AddSheet } from "./add-sheet";
 import { GenerationTree } from "./generation-tree";
@@ -13,6 +13,11 @@ type FamilyBookProps = {
     familyId: string,
     fromId: PersonId,
     kind: RelativeKind,
+    card: { name: string; clan: string; origin: string }
+  ) => Promise<{ error?: string }>;
+  updatePersonCard: (
+    familyId: string,
+    personId: PersonId,
     card: { name: string; clan: string; origin: string }
   ) => Promise<{ error?: string }>;
   issueKey: (
@@ -29,11 +34,12 @@ function countGenerations(doc: FamilyDocument): number {
   return count;
 }
 
-export function FamilyBook({ doc, addRelative, issueKey }: FamilyBookProps) {
+export function FamilyBook({ doc, addRelative, updatePersonCard, issueKey }: FamilyBookProps) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<PersonId>(doc.rootPersonId);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetKind, setSheetKind] = useState<RelativeKind | null>(null);
+  const [sheetMode, setSheetMode] = useState<"choose" | "add" | "edit">("choose");
   const [error, setError] = useState<string | null>(null);
   const [issuedUrl, setIssuedUrl] = useState<string | null>(null);
   const [issueError, setIssueError] = useState<string | null>(null);
@@ -42,9 +48,15 @@ export function FamilyBook({ doc, addRelative, issueKey }: FamilyBookProps) {
   const selectedPerson = doc.graph.persons.find((p) => p.id === selectedId);
   const showElderHint = countGenerations(doc) >= 2;
 
+  const unavailableKinds: RelativeKind[] = [];
+  if (hasFather(doc.graph, selectedId)) unavailableKinds.push("father");
+  if (hasMother(doc.graph, selectedId)) unavailableKinds.push("mother");
+  if (hasSpouse(doc.graph, selectedId)) unavailableKinds.push("spouse");
+
   function openSheet(personId: PersonId, kind: RelativeKind | null) {
     setSelectedId(personId);
     setSheetKind(kind);
+    setSheetMode(kind === null ? "choose" : "add");
     setError(null);
     setSheetOpen(true);
   }
@@ -90,6 +102,22 @@ export function FamilyBook({ doc, addRelative, issueKey }: FamilyBookProps) {
       }
       setSheetOpen(false);
       setSheetKind(null);
+      setSheetMode("choose");
+      router.refresh();
+    });
+  }
+
+  function handleEditSave(card: { name: string; clan: string; origin: string }) {
+    setError(null);
+    startTransition(async () => {
+      const result = await updatePersonCard(doc.id, selectedId, card);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setSheetOpen(false);
+      setSheetKind(null);
+      setSheetMode("choose");
       router.refresh();
     });
   }
@@ -129,15 +157,28 @@ export function FamilyBook({ doc, addRelative, issueKey }: FamilyBookProps) {
         open={sheetOpen}
         personName={selectedPerson?.name ?? "—"}
         kind={sheetKind}
+        mode={sheetMode}
+        unavailableKinds={unavailableKinds}
+        initialCard={{
+          name: selectedPerson?.name ?? "",
+          clan: selectedPerson?.clan ?? "",
+          origin: selectedPerson?.origin ?? "",
+        }}
         saving={pending}
         error={error}
         onClose={() => {
           setSheetOpen(false);
           setSheetKind(null);
+          setSheetMode("choose");
           setError(null);
         }}
         onSave={handleSave}
-        onKindChange={(k) => setSheetKind(k)}
+        onEditSave={handleEditSave}
+        onKindChange={(k) => {
+          setSheetKind(k);
+          setSheetMode("add");
+        }}
+        onEdit={() => setSheetMode("edit")}
       />
     </div>
   );

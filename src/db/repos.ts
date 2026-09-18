@@ -243,7 +243,7 @@ function relationFromRow(row: typeof relations.$inferSelect): Relation {
       type: "parent",
       parentId: row.parentId!,
       childId: row.childId!,
-      role: row.role as "father" | "mother",
+      role: row.role as "father" | "mother" | "parent",
     };
   }
   return {

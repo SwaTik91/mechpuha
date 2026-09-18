@@ -1,6 +1,6 @@
 "use client";
 
-import { hasChild, hasFather, hasMother, layoutGenerations } from "../domain/layout";
+import { hasChild, hasFather, hasMother, hasSpouse, layoutGenerations } from "../domain/layout";
 import type { FamilyGraph, PersonId, RelativeKind } from "../domain/types";
 
 type GenerationTreeProps = {
@@ -59,6 +59,7 @@ function PersonWithVacancies({
   const showVacancies = selected;
   const showFather = showVacancies && !hasFather(graph, id);
   const showMother = showVacancies && !hasMother(graph, id);
+  const showSpouse = showVacancies && !hasSpouse(graph, id);
   const showChild = showVacancies && !hasChild(graph, id);
 
   return (
@@ -69,7 +70,12 @@ function PersonWithVacancies({
           {showMother && <VacancyCard label="мать" onClick={() => onVacancy(id, "mother")} />}
         </div>
       )}
-      <PersonCard graph={graph} id={id} selected={selected} onSelect={onSelect} />
+      <div className="tree-row tree-row--couple">
+        <PersonCard graph={graph} id={id} selected={selected} onSelect={onSelect} />
+        {showSpouse && (
+          <VacancyCard label="супруг(а)" onClick={() => onVacancy(id, "spouse")} />
+        )}
+      </div>
       {showChild && (
         <div className="tree-row tree-row--vacancy">
           <VacancyCard label="ребёнок" onClick={() => onVacancy(id, "son")} />
@@ -117,7 +123,7 @@ export function GenerationTree({
   onSelect,
   onVacancy,
 }: GenerationTreeProps) {
-  const { ancestors, root, descendants } = layoutGenerations(graph, rootId);
+  const { ancestors, rootLevel, descendants } = layoutGenerations(graph, rootId);
 
   return (
     <div className="generation-tree">
@@ -133,7 +139,7 @@ export function GenerationTree({
       ))}
       <GenerationRow
         graph={graph}
-        ids={[root]}
+        ids={rootLevel}
         selectedId={selectedId}
         onSelect={onSelect}
         onVacancy={onVacancy}

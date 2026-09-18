@@ -4,15 +4,16 @@ import { registerAction } from "../auth-actions";
 export default async function RegisterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, next } = await searchParams;
 
   return (
     <main className="shell">
       <h1>Регистрация</h1>
       {error === "email_taken" && <p className="error">Аккаунт уже есть. Войдите.</p>}
       <form action={registerAction}>
+        {next && <input type="hidden" name="next" value={next} />}
         <div className="field">
           <label htmlFor="email">Почта</label>
           <input id="email" name="email" type="email" autoComplete="email" required />
@@ -24,7 +25,7 @@ export default async function RegisterPage({
         <button className="primary" type="submit">Создать аккаунт</button>
       </form>
       <p className="link-row">
-        <Link href="/login">Уже есть вход</Link>
+        <Link href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}>Уже есть вход</Link>
       </p>
     </main>
   );

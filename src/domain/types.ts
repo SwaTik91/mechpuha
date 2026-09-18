@@ -8,7 +8,7 @@ export type ParentRelation = {
   type: "parent";
   parentId: PersonId;
   childId: PersonId;
-  role: "father" | "mother";
+  role: "father" | "mother" | "parent";
 };
 export type SpouseRelation = { id: string; type: "spouse"; a: PersonId; b: PersonId };
 export type Relation = ParentRelation | SpouseRelation;

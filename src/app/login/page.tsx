@@ -25,7 +25,7 @@ export default async function LoginPage({
         <button className="primary" type="submit">Войти</button>
       </form>
       <p className="link-row">
-        <Link href="/register">Создать аккаунт</Link>
+        <Link href={next ? `/register?next=${encodeURIComponent(next)}` : "/register"}>Создать аккаунт</Link>
       </p>
     </main>
   );

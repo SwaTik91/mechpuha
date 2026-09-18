@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DomainError } from "../../src/domain/errors";
-import { normalizePersonCard } from "../../src/domain/person";
+import { normalizePersonCard, updatePersonCard } from "../../src/domain/person";
+import { emptyGraph, seedPerson } from "../../src/domain/relations";
 
 describe("normalizePersonCard", () => {
   it("requires a name", () => {
@@ -18,5 +19,28 @@ describe("normalizePersonCard", () => {
       clan: "Абрамовы",
       origin: null,
     });
+  });
+});
+
+describe("updatePersonCard", () => {
+  it("updates an existing person and rejects missing ids", () => {
+    let g = emptyGraph();
+    g = seedPerson(g, {
+      id: "p-david",
+      name: "Давид",
+      clan: "Абрамовы",
+      origin: "Москва",
+      claimedUserId: null,
+    });
+
+    g = updatePersonCard(g, "p-david", { name: "Давид-бен", clan: "Коэны", origin: "Иерусалим" });
+    expect(g.persons[0]).toMatchObject({
+      id: "p-david",
+      name: "Давид-бен",
+      clan: "Коэны",
+      origin: "Иерусалим",
+    });
+
+    expect(() => updatePersonCard(g, "missing", { name: "X" })).toThrowError(/PERSON_NOT_FOUND/);
   });
 });

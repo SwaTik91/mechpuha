@@ -14,7 +14,7 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command:
-      "npm run build && rm -f data/e2e.sqlite && DATABASE_PATH=./data/e2e.sqlite SESSION_SECRET=dev-secret-change-in-production-min-32-chars npx next start -p 3001",
+      "SESSION_SECRET=dev-secret-change-in-production-min-32-chars npm run build && rm -f data/e2e.sqlite && DATABASE_PATH=./data/e2e.sqlite SESSION_SECRET=dev-secret-change-in-production-min-32-chars npx next start -p 3001",
     url: "http://127.0.0.1:3001/login",
     reuseExistingServer: false,
     timeout: 120_000,

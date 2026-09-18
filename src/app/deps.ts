@@ -6,6 +6,10 @@ import { createDb } from "../db/client";
 import { createRepos } from "../db/repos";
 import { makeActions } from "./actions";
 
+if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+  throw new Error("SESSION_SECRET is required in production");
+}
+
 export const SESSION_SECRET =
   process.env.SESSION_SECRET ?? "dev-secret-change-in-production-min-32-chars";
 
