@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toDative, toGenitive } from "../domain/inflection";
 import type { RelativeKind } from "../domain/types";
 
 const KIND_OPTIONS: { kind: RelativeKind; label: string }[] = [
@@ -63,8 +64,8 @@ export function AddSheet({
     kind === "son" || kind === "daughter" ? childKind : kind;
   const title =
     kind !== null
-      ? `${KIND_TITLE[resolvedKind ?? "son"]} ${personName}`
-      : `Добавить к ${personName}`;
+      ? `${KIND_TITLE[resolvedKind ?? "son"]} ${toGenitive(personName)}`
+      : `Добавить к ${toDative(personName)}`;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
