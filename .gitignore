@@ -9,3 +9,5 @@ dist/
 .idea/
 .vscode/
 .superpowers/
+data/
+.next/
