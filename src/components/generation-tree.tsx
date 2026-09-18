@@ -1,0 +1,154 @@
+"use client";
+
+import { hasChild, hasFather, hasMother, layoutGenerations } from "../domain/layout";
+import type { FamilyGraph, PersonId, RelativeKind } from "../domain/types";
+
+type GenerationTreeProps = {
+  graph: FamilyGraph;
+  rootId: PersonId;
+  selectedId: PersonId;
+  onSelect: (id: PersonId) => void;
+  onVacancy: (personId: PersonId, kind: RelativeKind) => void;
+};
+
+function PersonCard({
+  graph,
+  id,
+  selected,
+  onSelect,
+}: {
+  graph: FamilyGraph;
+  id: PersonId;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const person = graph.persons.find((p) => p.id === id);
+  return (
+    <button
+      type="button"
+      className={`tree-card${selected ? " tree-card--selected" : ""}`}
+      onClick={onSelect}
+    >
+      <span className="tree-card__name">{person?.name ?? "—"}</span>
+      {person?.clan && <span className="tree-card__meta">{person.clan}</span>}
+    </button>
+  );
+}
+
+function VacancyCard({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" className="tree-card tree-card--vacancy" onClick={onClick}>
+      {label}
+    </button>
+  );
+}
+
+function PersonWithVacancies({
+  graph,
+  id,
+  selected,
+  onSelect,
+  onVacancy,
+}: {
+  graph: FamilyGraph;
+  id: PersonId;
+  selected: boolean;
+  onSelect: () => void;
+  onVacancy: (personId: PersonId, kind: RelativeKind) => void;
+}) {
+  const showVacancies = selected;
+  const showFather = showVacancies && !hasFather(graph, id);
+  const showMother = showVacancies && !hasMother(graph, id);
+  const showChild = showVacancies && !hasChild(graph, id);
+
+  return (
+    <div className="tree-person">
+      {(showFather || showMother) && (
+        <div className="tree-row tree-row--vacancy">
+          {showFather && <VacancyCard label="отец" onClick={() => onVacancy(id, "father")} />}
+          {showMother && <VacancyCard label="мать" onClick={() => onVacancy(id, "mother")} />}
+        </div>
+      )}
+      <PersonCard graph={graph} id={id} selected={selected} onSelect={onSelect} />
+      {showChild && (
+        <div className="tree-row tree-row--vacancy">
+          <VacancyCard label="ребёнок" onClick={() => onVacancy(id, "son")} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GenerationRow({
+  graph,
+  ids,
+  selectedId,
+  onSelect,
+  onVacancy,
+  root,
+}: {
+  graph: FamilyGraph;
+  ids: PersonId[];
+  selectedId: PersonId;
+  onSelect: (id: PersonId) => void;
+  onVacancy: (personId: PersonId, kind: RelativeKind) => void;
+  root?: boolean;
+}) {
+  return (
+    <div className={`tree-row${root ? " tree-row--root" : ""}`}>
+      {ids.map((id) => (
+        <PersonWithVacancies
+          key={id}
+          graph={graph}
+          id={id}
+          selected={id === selectedId}
+          onSelect={() => onSelect(id)}
+          onVacancy={onVacancy}
+        />
+      ))}
+    </div>
+  );
+}
+
+export function GenerationTree({
+  graph,
+  rootId,
+  selectedId,
+  onSelect,
+  onVacancy,
+}: GenerationTreeProps) {
+  const { ancestors, root, descendants } = layoutGenerations(graph, rootId);
+
+  return (
+    <div className="generation-tree">
+      {ancestors.map((level, i) => (
+        <GenerationRow
+          key={`a-${i}`}
+          graph={graph}
+          ids={level}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          onVacancy={onVacancy}
+        />
+      ))}
+      <GenerationRow
+        graph={graph}
+        ids={[root]}
+        selectedId={selectedId}
+        onSelect={onSelect}
+        onVacancy={onVacancy}
+        root
+      />
+      {descendants.map((level, i) => (
+        <GenerationRow
+          key={`d-${i}`}
+          graph={graph}
+          ids={level}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          onVacancy={onVacancy}
+        />
+      ))}
+    </div>
+  );
+}

@@ -96,3 +96,150 @@ a {
 .family-list a:hover {
   text-decoration: underline;
 }
+
+main.shell--wide {
+  max-width: 28rem;
+}
+
+.generation-tree {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.tree-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.tree-person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tree-card {
+  background: transparent;
+  border: 1px solid var(--rule);
+  padding: 0.75rem 1rem;
+  min-width: 6rem;
+  text-align: center;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.tree-card--selected {
+  outline: 1px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.tree-card--vacancy {
+  border-style: dashed;
+  color: var(--muted);
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  text-transform: lowercase;
+}
+
+.tree-card__name {
+  display: block;
+  font-size: 1.125rem;
+}
+
+.tree-card__meta {
+  display: block;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 0.25rem;
+}
+
+.family-book--dimmed .generation-tree,
+.family-book--dimmed .family-actions,
+.family-book--dimmed h1 {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(31, 26, 20, 0.12);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 10;
+}
+
+.sheet {
+  background: var(--paper);
+  border-top: 1px solid var(--rule);
+  width: 100%;
+  max-width: 28rem;
+  padding: 1.5rem 1.25rem 2rem;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.sheet__title {
+  font-size: 1.25rem;
+  font-weight: normal;
+  margin: 0 0 1.25rem;
+}
+
+.sheet__kinds {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sheet__kind-btn {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  padding: 0.75rem 0;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  color: inherit;
+}
+
+.sheet__child-kind {
+  display: flex;
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+}
+
+.family-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+}
+
+.text-action {
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.family-hint {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-style: italic;
+}

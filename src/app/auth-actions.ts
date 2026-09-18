@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { readSession, signSession } from "../auth/session";
 import { DomainError } from "../domain/errors";
+import type { FamilyId, PersonId, RelativeKind } from "../domain/types";
 import { actions, SESSION_SECRET } from "./deps";
 import { readSessionCookie, setSessionCookie } from "./session-cookie";
 
@@ -46,6 +47,36 @@ export async function loginAction(formData: FormData): Promise<void> {
   }
 
   redirect("/");
+}
+
+export async function addRelativeAction(
+  familyId: FamilyId,
+  fromId: PersonId,
+  kind: RelativeKind,
+  card: { name: string; clan: string; origin: string }
+): Promise<{ error?: string }> {
+  const userId = await requireUserId();
+
+  try {
+    await actions.addRelativeAction(userId, familyId, fromId, kind, card);
+    return {};
+  } catch (error) {
+    if (error instanceof DomainError) {
+      if (error.code === "NAME_REQUIRED") {
+        return { error: "Укажите имя" };
+      }
+      if (error.code === "FATHER_EXISTS" || error.code === "MOTHER_EXISTS") {
+        return { error: "Такой родитель уже есть" };
+      }
+      if (error.code === "SPOUSE_EXISTS") {
+        return { error: "Супруг(а) уже добавлен(а)" };
+      }
+      if (error.code === "FORBIDDEN") {
+        redirect("/");
+      }
+    }
+    throw error;
+  }
 }
 
 export async function createFamilyAction(formData: FormData): Promise<void> {
