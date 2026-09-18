@@ -9,5 +9,5 @@ dist/
 .idea/
 .vscode/
 .superpowers/
-data/
+data/*.sqlite
 .next/
