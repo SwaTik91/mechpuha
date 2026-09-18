@@ -1,0 +1,98 @@
+:root {
+  --paper: #f7f1e6;
+  --ink: #1f1a14;
+  --muted: #6b6256;
+  --rule: #cfc3ad;
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: Georgia, "Iowan Old Style", serif;
+  margin: 0;
+  min-height: 100%;
+}
+
+label {
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+input {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+  width: 100%;
+  padding: 8px 0;
+  font: inherit;
+  color: inherit;
+}
+
+button.primary {
+  background: transparent;
+  border: 1px solid var(--ink);
+  width: 100%;
+  padding: 10px;
+  font-family: system-ui, sans-serif;
+  cursor: pointer;
+  color: inherit;
+}
+
+main.shell {
+  max-width: 24rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+  font-weight: normal;
+  margin: 0 0 2rem;
+}
+
+.field {
+  margin-bottom: 1.25rem;
+}
+
+.link-row {
+  margin-top: 1.5rem;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+}
+
+a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.error {
+  color: #8b2500;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  margin-bottom: 1rem;
+}
+
+.family-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.family-list li {
+  border-bottom: 1px solid var(--rule);
+  padding: 0.75rem 0;
+}
+
+.family-list a {
+  text-decoration: none;
+  font-size: 1.125rem;
+}
+
+.family-list a:hover {
+  text-decoration: underline;
+}

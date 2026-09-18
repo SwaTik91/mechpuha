@@ -9,7 +9,7 @@ export type Db = ReturnType<typeof createDb>;
 export function createDb(path: string) {
   const sqlite = new Database(path);
   const db = drizzle(sqlite, { schema });
-  migrate(db, { migrationsFolder: join(import.meta.dirname, "../../drizzle") });
+  migrate(db, { migrationsFolder: join(process.cwd(), "drizzle") });
   return Object.assign(db, {
     close: () => sqlite.close(),
   });
