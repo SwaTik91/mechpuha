@@ -67,7 +67,11 @@ export function FamilyBook({ doc, addRelative, issueKey }: FamilyBookProps) {
         return;
       }
       if (result.url) {
-        await navigator.clipboard.writeText(result.url);
+        try {
+          await navigator.clipboard.writeText(result.url);
+        } catch {
+          // Clipboard may be unavailable in some browsers or test environments.
+        }
         setIssuedUrl(result.url);
       }
     });

@@ -15,9 +15,10 @@ const globalForDb = globalThis as typeof globalThis & {
 
 function getDb() {
   if (!globalForDb.mishpuchaDb) {
-    const dataDir = join(process.cwd(), "data");
-    mkdirSync(dataDir, { recursive: true });
-    globalForDb.mishpuchaDb = createDb(join(dataDir, "app.sqlite"));
+    const dbPath =
+      process.env.DATABASE_PATH ?? join(process.cwd(), "data", "app.sqlite");
+    mkdirSync(join(dbPath, ".."), { recursive: true });
+    globalForDb.mishpuchaDb = createDb(dbPath);
   }
   return globalForDb.mishpuchaDb;
 }
