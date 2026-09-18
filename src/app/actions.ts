@@ -29,6 +29,7 @@ type RepoDeps = Pick<
   | "listFamiliesForUser"
   | "saveKey"
   | "loadKey"
+  | "listViewKeys"
 >;
 
 export type ActionsDeps = RepoDeps & {
@@ -128,7 +129,8 @@ export function makeActions(deps: ActionsDeps) {
       if (!doc) {
         throw new DomainError("FORBIDDEN");
       }
-      const { next, revoked } = issueViewKey(doc, userId, nowMs(deps), []);
+      const existingViewKeys = deps.listViewKeys(familyId);
+      const { next, revoked } = issueViewKey(doc, userId, nowMs(deps), existingViewKeys);
       for (const oldKey of revoked) {
         deps.saveKey(oldKey);
       }

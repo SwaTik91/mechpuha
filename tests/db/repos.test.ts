@@ -65,6 +65,46 @@ describe("repos", () => {
     expect(repos.listFamiliesForUser(strangerId)).toEqual([]);
   });
 
+  it("lists view keys for a family", () => {
+    const userId = repos.createUser("owner@example.com", "hash");
+    const doc = createFamily(userId, { name: "Давид" });
+    repos.saveFamily(doc);
+
+    const viewKey: FamilyKey = {
+      token: "token-view-1",
+      type: "view",
+      familyId: doc.id,
+      personId: null,
+      expiresAt: Date.now() + 60_000,
+      usedAt: null,
+      revokedAt: null,
+    };
+    const helperKey: FamilyKey = {
+      token: "token-helper-1",
+      type: "helper",
+      familyId: doc.id,
+      personId: null,
+      expiresAt: Date.now() + 60_000,
+      usedAt: null,
+      revokedAt: null,
+    };
+    const otherFamilyViewKey: FamilyKey = {
+      token: "token-view-other",
+      type: "view",
+      familyId: "other-family",
+      personId: null,
+      expiresAt: Date.now() + 60_000,
+      usedAt: null,
+      revokedAt: null,
+    };
+    repos.saveKey(viewKey);
+    repos.saveKey(helperKey);
+    repos.saveKey(otherFamilyViewKey);
+
+    expect(repos.listViewKeys(doc.id)).toEqual([viewKey]);
+    expect(repos.listViewKeys("missing-family")).toEqual([]);
+  });
+
   it("saves and loads family keys", () => {
     const userId = repos.createUser("owner@example.com", "hash");
     const doc = createFamily(userId, { name: "Давид" });

@@ -20,6 +20,7 @@ export function createRepos(db: Db) {
     listFamiliesForUser: (userId: UserId) => listFamiliesForUser(db, userId),
     saveKey: (key: FamilyKey) => saveKey(db, key),
     loadKey: (token: string) => loadKey(db, token),
+    listViewKeys: (familyId: FamilyId) => listViewKeys(db, familyId),
   };
 }
 
@@ -186,6 +187,19 @@ function loadKey(db: Db, token: string): FamilyKey | null {
   if (!row) {
     return null;
   }
+  return keyFromRow(row);
+}
+
+function listViewKeys(db: Db, familyId: FamilyId): FamilyKey[] {
+  const rows = db
+    .select()
+    .from(familyKeys)
+    .where(and(eq(familyKeys.familyId, familyId), eq(familyKeys.type, "view")))
+    .all();
+  return rows.map(keyFromRow);
+}
+
+function keyFromRow(row: typeof familyKeys.$inferSelect): FamilyKey {
   return {
     token: row.token,
     type: row.type as FamilyKey["type"],

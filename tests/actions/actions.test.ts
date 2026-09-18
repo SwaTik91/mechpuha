@@ -47,6 +47,10 @@ function makeMockDeps(store: MockStore, overrides: Partial<ReturnType<typeof mak
       const key = store.keys.get(token);
       return key ? structuredClone(key) : null;
     },
+    listViewKeys: (familyId: string) =>
+      [...store.keys.values()]
+        .filter((key) => key.familyId === familyId && key.type === "view")
+        .map((key) => structuredClone(key)),
     hashPassword: async (plain: string) => `hash:${plain}`,
     verifyPassword: async (plain: string, hash: string) => hash === `hash:${plain}`,
     signSession: (userId: UserId) => `session:${userId}`,
@@ -71,6 +75,41 @@ describe("server actions", () => {
     expect(store.users.get("child@example.com")?.id).toBe(userId);
 
     await expect(actions.register("child@example.com", "other")).rejects.toMatchObject({ code: "EMAIL_TAKEN" });
+  });
+
+  it("login rejects unknown email and wrong password with INVALID_CREDENTIALS", async () => {
+    const store: MockStore = { users: new Map(), families: new Map(), keys: new Map() };
+    const actions = makeActions(makeMockDeps(store));
+
+    await actions.register("child@example.com", "password12");
+
+    await expect(actions.login("missing@example.com", "password12")).rejects.toMatchObject({
+      code: "INVALID_CREDENTIALS",
+    });
+    await expect(actions.login("child@example.com", "wrong-password")).rejects.toMatchObject({
+      code: "INVALID_CREDENTIALS",
+    });
+  });
+
+  it("issueViewAction revokes the previous poster token", async () => {
+    const store: MockStore = { users: new Map(), families: new Map(), keys: new Map() };
+    const deps = makeMockDeps(store);
+    const actions = makeActions(deps);
+
+    const ownerId = deps.createUser("owner@example.com", "hash:pw");
+    const doc = createFamily(ownerId, { name: "Давид", clan: "Абрамовы" });
+    deps.saveFamily(doc);
+
+    const firstToken = await actions.issueViewAction(ownerId, doc.id);
+    const snapshot = await actions.loadPoster(firstToken);
+    expect(snapshot).toEqual({ rootPersonId: doc.rootPersonId, graph: doc.graph });
+
+    const secondToken = await actions.issueViewAction(ownerId, doc.id);
+    await expect(actions.loadPoster(firstToken)).rejects.toMatchObject({ code: "KEY_INVALID" });
+    await expect(actions.loadPoster(secondToken)).resolves.toEqual({
+      rootPersonId: doc.rootPersonId,
+      graph: doc.graph,
+    });
   });
 
   it("loadFamilyForUser returns FORBIDDEN for a stranger", async () => {
