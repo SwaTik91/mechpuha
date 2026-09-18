@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { readSession } from "../../../auth/session";
 import { FamilyBook } from "../../../components/family-book";
 import { actions, SESSION_SECRET } from "../../deps";
-import { addRelativeAction } from "../../auth-actions";
+import { addRelativeAction, issueKeyAction } from "../../auth-actions";
 import { readSessionCookie } from "../../session-cookie";
 
 export default async function FamilyPage({ params }: { params: Promise<{ id: string }> }) {
@@ -22,7 +22,7 @@ export default async function FamilyPage({ params }: { params: Promise<{ id: str
 
   return (
     <main className="shell shell--wide">
-      <FamilyBook doc={doc} addRelative={addRelativeAction} />
+      <FamilyBook doc={doc} addRelative={addRelativeAction} issueKey={issueKeyAction} />
     </main>
   );
 }

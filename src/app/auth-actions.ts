@@ -35,17 +35,22 @@ export async function registerAction(formData: FormData): Promise<void> {
 export async function loginAction(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
+  const next = String(formData.get("next") ?? "");
 
   try {
     const token = await actions.login(email, password);
     await setSessionCookie(token);
   } catch (error) {
     if (error instanceof DomainError && error.code === "INVALID_CREDENTIALS") {
-      redirect("/login?error=1");
+      const nextQuery = next ? `&next=${encodeURIComponent(next)}` : "";
+      redirect(`/login?error=1${nextQuery}`);
     }
     throw error;
   }
 
+  if (next.startsWith("/") && !next.startsWith("//")) {
+    redirect(next);
+  }
   redirect("/");
 }
 
@@ -73,6 +78,72 @@ export async function addRelativeAction(
       }
       if (error.code === "FORBIDDEN") {
         redirect("/");
+      }
+    }
+    throw error;
+  }
+}
+
+export async function issueKeyAction(
+  familyId: FamilyId,
+  kind: "helper" | "view" | "claim"
+): Promise<{ url?: string; error?: string }> {
+  const userId = await requireUserId();
+
+  try {
+    let token: string;
+    if (kind === "helper") {
+      token = await actions.issueHelperAction(userId, familyId);
+    } else if (kind === "view") {
+      token = await actions.issueViewAction(userId, familyId);
+    } else {
+      token = await actions.issueClaimAction(userId, familyId);
+    }
+    const path = kind === "view" ? `/poster/${token}` : `/invite/${token}`;
+    return { url: path };
+  } catch (error) {
+    if (error instanceof DomainError) {
+      if (error.code === "FORBIDDEN") {
+        redirect("/");
+      }
+      if (error.code === "ALREADY_OWNED") {
+        return { error: "Дом уже забран" };
+      }
+    }
+    throw error;
+  }
+}
+
+export async function acceptHelperAction(token: string): Promise<{ error?: string }> {
+  const userId = await requireUserId();
+
+  try {
+    await actions.acceptHelperAction(userId, token);
+    return {};
+  } catch (error) {
+    if (error instanceof DomainError && error.code === "KEY_INVALID") {
+      return { error: "Приглашение недействительно" };
+    }
+    throw error;
+  }
+}
+
+export async function respondClaimAction(
+  token: string,
+  answer: "yes" | "no"
+): Promise<{ error?: string }> {
+  const userId = await requireUserId();
+
+  try {
+    await actions.respondClaimAction(userId, token, answer);
+    return {};
+  } catch (error) {
+    if (error instanceof DomainError) {
+      if (error.code === "KEY_INVALID") {
+        return { error: "Приглашение недействительно" };
+      }
+      if (error.code === "CARD_TAKEN") {
+        return { error: "Карточка уже занята" };
       }
     }
     throw error;

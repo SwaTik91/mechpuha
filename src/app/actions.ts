@@ -14,6 +14,7 @@ import type {
   FamilyGraph,
   FamilyId,
   FamilyKey,
+  Person,
   PersonId,
   RelativeKind,
   UserId,
@@ -64,6 +65,17 @@ function claimTtl(deps: ActionsDeps): number {
 function assertKeyLive(key: FamilyKey, doc: FamilyDocument, type: FamilyKey["type"], now: number): void {
   if (
     key.type !== type ||
+    key.familyId !== doc.id ||
+    key.usedAt !== null ||
+    key.revokedAt !== null ||
+    now >= key.expiresAt
+  ) {
+    throw new DomainError("KEY_INVALID");
+  }
+}
+
+function assertInviteKeyLive(key: FamilyKey, doc: FamilyDocument, now: number): void {
+  if (
     key.familyId !== doc.id ||
     key.usedAt !== null ||
     key.revokedAt !== null ||
@@ -196,6 +208,25 @@ export function makeActions(deps: ActionsDeps) {
       }
       assertKeyLive(key, doc, "view", nowMs(deps));
       return { rootPersonId: doc.rootPersonId, graph: doc.graph };
+    },
+
+    async loadInviteKey(
+      token: string
+    ): Promise<{ type: FamilyKey["type"]; person: Person | null }> {
+      const key = deps.loadKey(token);
+      if (!key) {
+        throw new DomainError("KEY_INVALID");
+      }
+      const doc = deps.loadFamily(key.familyId);
+      if (!doc) {
+        throw new DomainError("KEY_INVALID");
+      }
+      assertInviteKeyLive(key, doc, nowMs(deps));
+      if (key.type === "claim" && key.personId) {
+        const person = doc.graph.persons.find((p) => p.id === key.personId) ?? null;
+        return { type: key.type, person };
+      }
+      return { type: key.type, person: null };
     },
   };
 }

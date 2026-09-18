@@ -15,6 +15,10 @@ type FamilyBookProps = {
     kind: RelativeKind,
     card: { name: string; clan: string; origin: string }
   ) => Promise<{ error?: string }>;
+  issueKey: (
+    familyId: string,
+    kind: "helper" | "view" | "claim"
+  ) => Promise<{ url?: string; error?: string }>;
 };
 
 function countGenerations(doc: FamilyDocument): number {
@@ -25,12 +29,14 @@ function countGenerations(doc: FamilyDocument): number {
   return count;
 }
 
-export function FamilyBook({ doc, addRelative }: FamilyBookProps) {
+export function FamilyBook({ doc, addRelative, issueKey }: FamilyBookProps) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<PersonId>(doc.rootPersonId);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetKind, setSheetKind] = useState<RelativeKind | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [issuedUrl, setIssuedUrl] = useState<string | null>(null);
+  const [issueError, setIssueError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const selectedPerson = doc.graph.persons.find((p) => p.id === selectedId);
@@ -50,6 +56,21 @@ export function FamilyBook({ doc, addRelative }: FamilyBookProps) {
 
   function handleVacancy(personId: PersonId, kind: RelativeKind) {
     openSheet(personId, kind);
+  }
+
+  function handleIssue(kind: "helper" | "view" | "claim") {
+    setIssueError(null);
+    startTransition(async () => {
+      const result = await issueKey(doc.id, kind);
+      if (result.error) {
+        setIssueError(result.error);
+        return;
+      }
+      if (result.url) {
+        await navigator.clipboard.writeText(result.url);
+        setIssuedUrl(result.url);
+      }
+    });
   }
 
   function handleSave(
@@ -82,9 +103,19 @@ export function FamilyBook({ doc, addRelative }: FamilyBookProps) {
       />
 
       <nav className="family-actions">
-        <button type="button" className="text-action">Позвать помощника</button>
-        <button type="button" className="text-action">Ссылка для старшего</button>
-        <button type="button" className="text-action">Пригласить забрать дом</button>
+        <button type="button" className="text-action" onClick={() => handleIssue("helper")} disabled={pending}>
+          Позвать помощника
+        </button>
+        <button type="button" className="text-action" onClick={() => handleIssue("view")} disabled={pending}>
+          Ссылка для старшего
+        </button>
+        <button type="button" className="text-action" onClick={() => handleIssue("claim")} disabled={pending}>
+          Пригласить забрать дом
+        </button>
+        {issueError && <p className="error">{issueError}</p>}
+        {issuedUrl && (
+          <p className="family-url" data-testid="poster-url">{issuedUrl}</p>
+        )}
         {showElderHint && (
           <p className="family-hint">Можно показать старшему</p>
         )}

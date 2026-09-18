@@ -4,15 +4,16 @@ import { loginAction } from "../auth-actions";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, next } = await searchParams;
 
   return (
     <main className="shell">
       <h1>Вход</h1>
       {error && <p className="error">Неверная почта или пароль</p>}
       <form action={loginAction}>
+        {next && <input type="hidden" name="next" value={next} />}
         <div className="field">
           <label htmlFor="email">Почта</label>
           <input id="email" name="email" type="email" autoComplete="email" required />
