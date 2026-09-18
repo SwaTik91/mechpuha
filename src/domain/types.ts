@@ -13,4 +13,11 @@ export type ParentRelation = {
 export type SpouseRelation = { id: string; type: "spouse"; a: PersonId; b: PersonId };
 export type Relation = ParentRelation | SpouseRelation;
 export type FamilyGraph = { persons: Person[]; relations: Relation[] };
+export type FamilyDocument = {
+  id: FamilyId;
+  rootPersonId: PersonId;
+  ownerUserId: UserId | null;
+  graph: FamilyGraph;
+  members: { userId: UserId; role: "helper" | "owner" }[];
+};
 export type RelativeKind = "father" | "mother" | "spouse" | "son" | "daughter";
