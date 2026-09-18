@@ -21,3 +21,12 @@ export type FamilyDocument = {
   members: { userId: UserId; role: "helper" | "owner" }[];
 };
 export type RelativeKind = "father" | "mother" | "spouse" | "son" | "daughter";
+export type FamilyKey = {
+  token: string;
+  type: "helper" | "view" | "claim";
+  familyId: FamilyId;
+  personId: PersonId | null;
+  expiresAt: number;
+  usedAt: number | null;
+  revokedAt: number | null;
+};
