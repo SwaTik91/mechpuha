@@ -1,17 +1,13 @@
 import { mkdirSync } from "fs";
 import { join } from "path";
 import { hashPassword, verifyPassword } from "../auth/password";
+import { resolveSessionSecret } from "../auth/session-secret";
 import { signSession } from "../auth/session";
 import { createDb } from "../db/client";
 import { createRepos } from "../db/repos";
 import { makeActions } from "./actions";
 
-if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
-  throw new Error("SESSION_SECRET is required in production");
-}
-
-export const SESSION_SECRET =
-  process.env.SESSION_SECRET ?? "dev-secret-change-in-production-min-32-chars";
+export const SESSION_SECRET = resolveSessionSecret();
 
 const globalForDb = globalThis as typeof globalThis & {
   mishpuchaDb?: ReturnType<typeof createDb>;
