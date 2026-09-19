@@ -28,4 +28,14 @@ describe("resolveSessionSecret", () => {
       /SESSION_SECRET is required in production/,
     );
   });
+
+  it("does not throw on Vercel production when SESSION_SECRET is unset", () => {
+    expect(
+      resolveSessionSecret({
+        NODE_ENV: "production",
+        VERCEL: "1",
+        VERCEL_PROJECT_ID: "prj_test",
+      }),
+    ).toBe("vercel:prj_test");
+  });
 });
