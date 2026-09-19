@@ -3,10 +3,11 @@ import { readSession } from "../../../auth/session";
 import { InviteAccept } from "../../../components/invite-accept";
 import { DomainError } from "../../../domain/errors";
 import { acceptHelperAction, respondClaimAction } from "../../auth-actions";
-import { actions, SESSION_SECRET } from "../../deps";
+import { actions, hydrateStore, SESSION_SECRET } from "../../deps";
 import { readSessionCookie } from "../../session-cookie";
 
 export default async function InvitePage({ params }: { params: Promise<{ token: string }> }) {
+  await hydrateStore();
   const { token } = await params;
   const nextPath = `/invite/${token}`;
 

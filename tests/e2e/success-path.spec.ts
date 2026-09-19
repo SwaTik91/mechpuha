@@ -11,13 +11,13 @@ async function register(page: import("@playwright/test").Page, email: string) {
 async function createRootFamily(
   page: import("@playwright/test").Page,
   name: string,
-  clan: string,
-  origin: string
+  surname: string,
+  birthPlace: string
 ) {
   if (page.url().includes("/create")) {
     await page.getByLabel("Имя").fill(name);
-    await page.getByLabel("Род").fill(clan);
-    await page.getByLabel("Происхождение старшего").fill(origin);
+    await page.getByLabel("Фамилия").fill(surname);
+    await page.getByLabel("Место рождения").fill(birthPlace);
     await page.getByRole("button", { name: "Открыть книгу" }).click();
     await page.waitForURL(/\/family\//);
   }
@@ -36,7 +36,7 @@ test("open register, build two generations, open poster without login", async ({
   const fatherForm = page.getByRole("dialog");
   await expect(fatherForm).toBeVisible();
   await fatherForm.getByLabel("Имя").fill("Рахамим");
-  await fatherForm.getByLabel("Происхождение").fill("Дербент");
+  await fatherForm.getByLabel("Место рождения").fill("Дербент");
   await fatherForm.getByRole("button", { name: "Сохранить" }).click();
   await expect(page.getByRole("button", { name: /Рахамим/ })).toBeVisible();
 

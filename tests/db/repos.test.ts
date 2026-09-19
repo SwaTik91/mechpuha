@@ -50,7 +50,7 @@ describe("repos", () => {
 
   it("saves and loads a family document", () => {
     const userId = repos.createUser("owner@example.com", "hash");
-    const doc = createFamily(userId, { name: "Давид", clan: "Абрамовы", origin: "Москва" });
+    const doc = createFamily(userId, { name: "Давид", surname: "Абрамов", birthPlace: "Москва" });
     repos.saveFamily(doc);
     expect(repos.loadFamily(doc.id)).toEqual(doc);
   });

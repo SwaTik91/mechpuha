@@ -13,11 +13,11 @@ describe("normalizePersonCard", () => {
     }
   });
 
-  it("keeps clan and origin optional and trims", () => {
-    expect(normalizePersonCard({ name: "  Давид  ", clan: " Абрамовы ", origin: "" })).toEqual({
+  it("keeps surname and birth place optional and trims", () => {
+    expect(normalizePersonCard({ name: "  Давид  ", surname: " Абрамов ", birthPlace: "" })).toEqual({
       name: "Давид",
-      clan: "Абрамовы",
-      origin: null,
+      surname: "Абрамов",
+      birthPlace: null,
     });
   });
 });
@@ -28,17 +28,17 @@ describe("updatePersonCard", () => {
     g = seedPerson(g, {
       id: "p-david",
       name: "Давид",
-      clan: "Абрамовы",
-      origin: "Москва",
+      surname: "Абрамов",
+      birthPlace: "Москва",
       claimedUserId: null,
     });
 
-    g = updatePersonCard(g, "p-david", { name: "Давид-бен", clan: "Коэны", origin: "Иерусалим" });
+    g = updatePersonCard(g, "p-david", { name: "Давид-бен", surname: "Коэн", birthPlace: "Иерусалим" });
     expect(g.persons[0]).toMatchObject({
       id: "p-david",
       name: "Давид-бен",
-      clan: "Коэны",
-      origin: "Иерусалим",
+      surname: "Коэн",
+      birthPlace: "Иерусалим",
     });
 
     expect(() => updatePersonCard(g, "missing", { name: "X" })).toThrowError(/PERSON_NOT_FOUND/);

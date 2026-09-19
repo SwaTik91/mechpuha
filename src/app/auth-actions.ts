@@ -4,10 +4,11 @@ import { redirect } from "next/navigation";
 import { readSession, signSession } from "../auth/session";
 import { DomainError } from "../domain/errors";
 import type { FamilyId, PersonId, RelativeKind } from "../domain/types";
-import { actions, SESSION_SECRET } from "./deps";
+import { actions, hydrateStore, persistStore, SESSION_SECRET } from "./deps";
 import { readSessionCookie, setSessionCookie } from "./session-cookie";
 
 async function requireUserId(): Promise<string> {
+  await hydrateStore();
   const token = await readSessionCookie();
   if (!token) redirect("/login");
   const userId = readSession(token, SESSION_SECRET);
@@ -21,8 +22,10 @@ export async function registerAction(formData: FormData): Promise<void> {
   const next = String(formData.get("next") ?? "");
 
   try {
+    await hydrateStore();
     const userId = await actions.register(email, password);
     await setSessionCookie(signSession(userId, SESSION_SECRET));
+    await persistStore();
   } catch (error) {
     if (error instanceof DomainError && error.code === "EMAIL_TAKEN") {
       const nextQuery = next ? `&next=${encodeURIComponent(next)}` : "";
@@ -43,6 +46,7 @@ export async function loginAction(formData: FormData): Promise<void> {
   const next = String(formData.get("next") ?? "");
 
   try {
+    await hydrateStore();
     const token = await actions.login(email, password);
     await setSessionCookie(token);
   } catch (error) {
@@ -62,12 +66,13 @@ export async function loginAction(formData: FormData): Promise<void> {
 export async function updatePersonCardAction(
   familyId: FamilyId,
   personId: PersonId,
-  card: { name: string; clan: string; origin: string }
+  card: { name: string; surname: string; birthPlace: string }
 ): Promise<{ error?: string }> {
   const userId = await requireUserId();
 
   try {
     await actions.updatePersonCardAction(userId, familyId, personId, card);
+    await persistStore();
     return {};
   } catch (error) {
     if (error instanceof DomainError) {
@@ -89,12 +94,13 @@ export async function addRelativeAction(
   familyId: FamilyId,
   fromId: PersonId,
   kind: RelativeKind,
-  card: { name: string; clan: string; origin: string }
+  card: { name: string; surname: string; birthPlace: string }
 ): Promise<{ error?: string }> {
   const userId = await requireUserId();
 
   try {
     await actions.addRelativeAction(userId, familyId, fromId, kind, card);
+    await persistStore();
     return {};
   } catch (error) {
     if (error instanceof DomainError) {
@@ -131,6 +137,7 @@ export async function issueKeyAction(
       token = await actions.issueClaimAction(userId, familyId);
     }
     const path = kind === "view" ? `/poster/${token}` : `/invite/${token}`;
+    await persistStore();
     return { url: path };
   } catch (error) {
     if (error instanceof DomainError) {
@@ -150,6 +157,7 @@ export async function acceptHelperAction(token: string): Promise<{ error?: strin
 
   try {
     await actions.acceptHelperAction(userId, token);
+    await persistStore();
     return {};
   } catch (error) {
     if (error instanceof DomainError && error.code === "KEY_INVALID") {
@@ -167,6 +175,7 @@ export async function respondClaimAction(
 
   try {
     await actions.respondClaimAction(userId, token, answer);
+    await persistStore();
     return {};
   } catch (error) {
     if (error instanceof DomainError) {
@@ -184,11 +193,12 @@ export async function respondClaimAction(
 export async function createFamilyAction(formData: FormData): Promise<void> {
   const userId = await requireUserId();
   const name = String(formData.get("name") ?? "");
-  const clan = String(formData.get("clan") ?? "");
-  const origin = String(formData.get("origin") ?? "");
+  const surname = String(formData.get("surname") ?? "");
+  const birthPlace = String(formData.get("birthPlace") ?? "");
 
   try {
-    const familyId = await actions.createFamilyAction(userId, { name, clan, origin });
+    const familyId = await actions.createFamilyAction(userId, { name, surname, birthPlace });
+    await persistStore();
     redirect(`/family/${familyId}`);
   } catch (error) {
     if (error instanceof DomainError && error.code === "NAME_REQUIRED") {

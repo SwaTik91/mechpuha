@@ -1,7 +1,8 @@
 export type PersonId = string;
 export type FamilyId = string;
 export type UserId = string;
-export type PersonCard = { name: string; clan: string | null; origin: string | null };
+export type PersonCardInput = { name?: string; surname?: string; birthPlace?: string };
+export type PersonCard = { name: string; surname: string | null; birthPlace: string | null };
 export type Person = PersonCard & { id: PersonId; claimedUserId: UserId | null };
 export type ParentRelation = {
   id: string;

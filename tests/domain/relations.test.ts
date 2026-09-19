@@ -3,14 +3,14 @@ import { addRelative, emptyGraph, linkParent, seedPerson } from "../../src/domai
 
 function davidGraph() {
   const g = emptyGraph();
-  return seedPerson(g, { id: "p-david", name: "Давид", clan: "Абрамовы", origin: "Москва", claimedUserId: null });
+  return seedPerson(g, { id: "p-david", name: "Давид", surname: "Абрамов", birthPlace: "Москва", claimedUserId: null });
 }
 
 describe("addRelative", () => {
   it("adds a father and a mother, then rejects a second father", () => {
     let g = davidGraph();
-    g = addRelative(g, "p-david", "father", { name: "Рахамим", origin: "Дербент" });
-    g = addRelative(g, "p-david", "mother", { name: "Сара", origin: "Куба" });
+    g = addRelative(g, "p-david", "father", { name: "Рахамим", birthPlace: "Дербент" });
+    g = addRelative(g, "p-david", "mother", { name: "Сара", birthPlace: "Куба" });
     expect(g.persons.map((p) => p.name).sort()).toEqual(["Давид", "Рахамим", "Сара"]);
     expect(() => addRelative(g, "p-david", "father", { name: "Другой" })).toThrowError(/FATHER_EXISTS/);
   });

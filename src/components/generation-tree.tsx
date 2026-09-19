@@ -1,6 +1,7 @@
 "use client";
 
 import { hasChild, hasFather, hasMother, hasSpouse, layoutGenerations } from "../domain/layout";
+import { personDisplayName } from "../domain/person";
 import type { FamilyGraph, PersonId, RelativeKind } from "../domain/types";
 
 type GenerationTreeProps = {
@@ -29,8 +30,8 @@ function PersonCard({
       className={`tree-card${selected ? " tree-card--selected" : ""}`}
       onClick={onSelect}
     >
-      <span className="tree-card__name">{person?.name ?? "—"}</span>
-      {person?.clan && <span className="tree-card__meta">{person.clan}</span>}
+      <span className="tree-card__name">{person ? personDisplayName(person) : "—"}</span>
+      {person?.birthPlace && <span className="tree-card__meta">{person.birthPlace}</span>}
     </button>
   );
 }

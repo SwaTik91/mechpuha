@@ -2,11 +2,12 @@ import { redirect } from "next/navigation";
 import { readSession } from "../../../auth/session";
 import { FamilyBook } from "../../../components/family-book";
 import { DomainError } from "../../../domain/errors";
-import { actions, SESSION_SECRET } from "../../deps";
+import { actions, hydrateStore, SESSION_SECRET } from "../../deps";
 import { addRelativeAction, issueKeyAction, updatePersonCardAction } from "../../auth-actions";
 import { readSessionCookie } from "../../session-cookie";
 
 export default async function FamilyPage({ params }: { params: Promise<{ id: string }> }) {
+  await hydrateStore();
   const token = await readSessionCookie();
   if (!token) redirect("/login");
   const userId = readSession(token, SESSION_SECRET);

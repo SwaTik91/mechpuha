@@ -5,7 +5,7 @@ import { addRelative, emptyGraph, seedPerson } from "../../src/domain/relations"
 describe("layoutGenerations", () => {
   it("places parents above the root and children below", () => {
     let g = emptyGraph();
-    g = seedPerson(g, { id: "d", name: "Давид", clan: null, origin: null, claimedUserId: null });
+    g = seedPerson(g, { id: "d", name: "Давид", surname: null, birthPlace: null, claimedUserId: null });
     g = addRelative(g, "d", "father", { name: "Рахамим" });
     g = addRelative(g, "d", "son", { name: "Ноах" });
     const { ancestors, root, descendants } = layoutGenerations(g, "d");
@@ -16,7 +16,7 @@ describe("layoutGenerations", () => {
 
   it("places spouse beside partner after addRelative", () => {
     let g = emptyGraph();
-    g = seedPerson(g, { id: "d", name: "Давид", clan: null, origin: null, claimedUserId: null });
+    g = seedPerson(g, { id: "d", name: "Давид", surname: null, birthPlace: null, claimedUserId: null });
     g = addRelative(g, "d", "spouse", { name: "Мирьям" });
     const spouse = g.persons.find((p) => p.name === "Мирьям")!;
     const { rootLevel } = layoutGenerations(g, "d");
@@ -27,7 +27,7 @@ describe("layoutGenerations", () => {
 
   it("includes grandparents when parents have parents", () => {
     let g = emptyGraph();
-    g = seedPerson(g, { id: "d", name: "Давид", clan: null, origin: null, claimedUserId: null });
+    g = seedPerson(g, { id: "d", name: "Давид", surname: null, birthPlace: null, claimedUserId: null });
     g = addRelative(g, "d", "father", { name: "Рахамим" });
     const rahamim = g.persons.find((p) => p.name === "Рахамим")!;
     g = addRelative(g, rahamim.id, "father", { name: "Авраам" });

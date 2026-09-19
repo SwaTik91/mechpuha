@@ -4,6 +4,7 @@ import type {
   FamilyGraph,
   ParentRelation,
   Person,
+  PersonCardInput,
   PersonId,
   RelativeKind,
   SpouseRelation,
@@ -88,7 +89,7 @@ export function addRelative(
   graph: FamilyGraph,
   fromId: PersonId,
   kind: RelativeKind,
-  card: { name?: string; clan?: string; origin?: string }
+  card: PersonCardInput
 ): FamilyGraph {
   if (!findPerson(graph, fromId)) {
     throw new DomainError("PERSON_NOT_FOUND");

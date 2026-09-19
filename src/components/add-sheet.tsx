@@ -26,15 +26,15 @@ type AddSheetProps = {
   kind: RelativeKind | null;
   mode: "choose" | "add" | "edit";
   unavailableKinds?: RelativeKind[];
-  initialCard?: { name: string; clan: string; origin: string };
+  initialCard?: { name: string; surname: string; birthPlace: string };
   saving?: boolean;
   error?: string | null;
   onClose: () => void;
   onSave: (
-    card: { name: string; clan: string; origin: string },
+    card: { name: string; surname: string; birthPlace: string },
     kind: RelativeKind
   ) => void;
-  onEditSave: (card: { name: string; clan: string; origin: string }) => void;
+  onEditSave: (card: { name: string; surname: string; birthPlace: string }) => void;
   onKindChange?: (kind: RelativeKind) => void;
   onEdit?: () => void;
 };
@@ -55,22 +55,22 @@ export function AddSheet({
   onEdit,
 }: AddSheetProps) {
   const [name, setName] = useState("");
-  const [clan, setClan] = useState("");
-  const [origin, setOrigin] = useState("");
+  const [surname, setSurname] = useState("");
+  const [birthPlace, setBirthPlace] = useState("");
   const [childKind, setChildKind] = useState<"son" | "daughter">("son");
 
   useEffect(() => {
     if (!open) return;
     if (mode === "edit" && initialCard) {
       setName(initialCard.name);
-      setClan(initialCard.clan);
-      setOrigin(initialCard.origin);
+      setSurname(initialCard.surname);
+      setBirthPlace(initialCard.birthPlace);
       setChildKind("son");
       return;
     }
     setName("");
-    setClan("");
-    setOrigin("");
+    setSurname("");
+    setBirthPlace("");
     setChildKind("son");
   }, [open, kind, personName, mode, initialCard]);
 
@@ -88,11 +88,11 @@ export function AddSheet({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (mode === "edit") {
-      onEditSave({ name, clan, origin });
+      onEditSave({ name, surname, birthPlace });
       return;
     }
     if (!resolvedKind) return;
-    onSave({ name, clan, origin }, resolvedKind);
+    onSave({ name, surname, birthPlace }, resolvedKind);
   }
 
   return (
@@ -167,15 +167,15 @@ export function AddSheet({
               />
             </div>
             <div className="field">
-              <label htmlFor="add-clan">Род</label>
-              <input id="add-clan" value={clan} onChange={(e) => setClan(e.target.value)} />
+              <label htmlFor="add-surname">Фамилия</label>
+              <input id="add-surname" value={surname} onChange={(e) => setSurname(e.target.value)} />
             </div>
             <div className="field">
-              <label htmlFor="add-origin">Происхождение</label>
+              <label htmlFor="add-birthPlace">Место рождения</label>
               <input
-                id="add-origin"
-                value={origin}
-                onChange={(e) => setOrigin(e.target.value)}
+                id="add-birthPlace"
+                value={birthPlace}
+                onChange={(e) => setBirthPlace(e.target.value)}
               />
             </div>
 

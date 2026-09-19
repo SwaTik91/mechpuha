@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { readSession } from "../auth/session";
-import { repos, SESSION_SECRET } from "./deps";
+import { hydrateStore, repos, SESSION_SECRET } from "./deps";
 import { readSessionCookie } from "./session-cookie";
 
 export default async function HomePage() {
+  await hydrateStore();
   const token = await readSessionCookie();
   if (!token) redirect("/login");
 

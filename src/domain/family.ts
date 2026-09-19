@@ -1,7 +1,7 @@
 import { normalizePersonCard } from "./person";
-import type { FamilyDocument, UserId } from "./types";
+import type { FamilyDocument, PersonCardInput, UserId } from "./types";
 
-export function createFamily(userId: UserId, elder: { name?: string; clan?: string; origin?: string }): FamilyDocument {
+export function createFamily(userId: UserId, elder: PersonCardInput): FamilyDocument {
   const card = normalizePersonCard(elder);
   const rootId = crypto.randomUUID();
   return {

@@ -1,14 +1,15 @@
 import { DomainError } from "../../../domain/errors";
 import { PosterTree } from "../../../components/poster-tree";
-import { actions } from "../../deps";
+import { actions, hydrateStore } from "../../deps";
 
 export default async function PosterPage({ params }: { params: Promise<{ token: string }> }) {
+  await hydrateStore();
   const { token } = await params;
 
   try {
     const { rootPersonId, graph } = await actions.loadPoster(token);
     const root = graph.persons.find((p) => p.id === rootPersonId);
-    const title = root?.clan ?? `Семья ${root?.name ?? "—"}`;
+    const title = root?.surname ?? `Семья ${root?.name ?? "—"}`;
 
     return (
       <main className="shell shell--wide poster">
