@@ -3,12 +3,17 @@ const DEV_FALLBACK = "dev-secret-change-in-production-min-32-chars";
 export function resolveSessionSecret(
   env: NodeJS.ProcessEnv = process.env,
 ): string {
-  if (
-    env.NODE_ENV === "production" &&
-    !env.SESSION_SECRET &&
-    env.NEXT_PHASE !== "phase-production-build"
-  ) {
+  if (env.SESSION_SECRET) return env.SESSION_SECRET;
+
+  const duringNextBuild = env.NEXT_PHASE === "phase-production-build";
+  const onVercel = env.VERCEL === "1";
+  if (env.NODE_ENV === "production" && !duringNextBuild && !onVercel) {
     throw new Error("SESSION_SECRET is required in production");
   }
-  return env.SESSION_SECRET ?? DEV_FALLBACK;
+
+  if (onVercel && env.VERCEL_PROJECT_ID) {
+    return `vercel:${env.VERCEL_PROJECT_ID}`;
+  }
+
+  return DEV_FALLBACK;
 }

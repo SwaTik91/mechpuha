@@ -1,9 +1,10 @@
 import { mkdirSync } from "fs";
 import { createRequire } from "node:module";
-import { join } from "path";
+import { dirname } from "path";
 import { hashPassword, verifyPassword } from "../auth/password";
 import { resolveSessionSecret } from "../auth/session-secret";
 import { signSession } from "../auth/session";
+import { resolveDatabasePath } from "../db/database-path";
 import { createRepos } from "../db/repos";
 import { makeActions } from "./actions";
 
@@ -22,9 +23,8 @@ function getRuntime() {
     // this module for SESSION_SECRET; opening SQLite here breaks Vercel builds.
     const require = createRequire(__filename);
     const { createDb } = require("../db/client") as typeof import("../db/client");
-    const dbPath =
-      process.env.DATABASE_PATH ?? join(process.cwd(), "data", "app.sqlite");
-    mkdirSync(join(dbPath, ".."), { recursive: true });
+    const dbPath = resolveDatabasePath();
+    mkdirSync(dirname(dbPath), { recursive: true });
     const repos = createRepos(createDb(dbPath));
     globalForRuntime.mishpuchaRuntime = {
       repos,
