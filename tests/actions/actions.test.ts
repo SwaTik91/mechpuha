@@ -97,7 +97,7 @@ describe("server actions", () => {
     const actions = makeActions(deps);
 
     const ownerId = deps.createUser("owner@example.com", "hash:pw");
-    const doc = createFamily(ownerId, { name: "Давид", clan: "Абрамовы" });
+    const doc = createFamily(ownerId, { name: "Давид", surname: "Абрамов" });
     deps.saveFamily(doc);
 
     const firstToken = await actions.issueViewAction(ownerId, doc.id);
@@ -132,7 +132,7 @@ describe("server actions", () => {
     const actions = makeActions(deps);
 
     const ownerId = deps.createUser("owner@example.com", "hash:pw");
-    const doc = createFamily(ownerId, { name: "Давид", clan: "Абрамовы" });
+    const doc = createFamily(ownerId, { name: "Давид", surname: "Абрамов" });
     deps.saveFamily(doc);
 
     const { next: viewKey } = issueViewKey(doc, ownerId, NOW, []);

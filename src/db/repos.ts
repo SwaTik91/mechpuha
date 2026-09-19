@@ -96,8 +96,8 @@ function saveFamily(db: Db, doc: FamilyDocument): void {
           id: person.id,
           familyId: doc.id,
           name: person.name,
-          clan: person.clan,
-          origin: person.origin,
+          surname: person.surname,
+          birthPlace: person.birthPlace,
           claimedUserId: person.claimedUserId,
         })
         .run();
@@ -133,8 +133,8 @@ function loadFamily(db: Db, id: FamilyId): FamilyDocument | null {
       persons: personRows.map((row) => ({
         id: row.id,
         name: row.name,
-        clan: row.clan,
-        origin: row.origin,
+        surname: row.surname,
+        birthPlace: row.birthPlace,
         claimedUserId: row.claimedUserId,
       })),
       relations: relationRows.map(relationFromRow),

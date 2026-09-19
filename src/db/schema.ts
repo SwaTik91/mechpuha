@@ -28,8 +28,8 @@ export const persons = sqliteTable("persons", {
     .notNull()
     .references(() => families.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
-  clan: text("clan"),
-  origin: text("origin"),
+  surname: text("surname"),
+  birthPlace: text("birth_place"),
   claimedUserId: text("claimed_user_id"),
 });
 

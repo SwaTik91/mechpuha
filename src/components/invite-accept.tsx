@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { personDisplayName } from "../domain/person";
 import type { Person } from "../domain/types";
 
 type InviteAcceptProps = {
@@ -57,9 +58,8 @@ export function InviteAccept({ token, type, person, acceptHelper, respondClaim }
   return (
     <div className="invite-accept">
       <div className="invite-card">
-        <span className="invite-card__name">{person?.name ?? "—"}</span>
-        {person?.clan && <span className="invite-card__meta">{person.clan}</span>}
-        {person?.origin && <span className="invite-card__meta">{person.origin}</span>}
+        <span className="invite-card__name">{person ? personDisplayName(person) : "—"}</span>
+        {person?.birthPlace && <span className="invite-card__meta">{person.birthPlace}</span>}
       </div>
       <p className="invite-question">Это вы?</p>
       {error && <p className="error">{error}</p>}

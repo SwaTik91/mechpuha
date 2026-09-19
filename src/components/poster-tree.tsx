@@ -1,4 +1,5 @@
 import { layoutGenerations } from "../domain/layout";
+import { personDisplayName } from "../domain/person";
 import type { FamilyGraph, PersonId } from "../domain/types";
 
 type PosterTreeProps = {
@@ -10,9 +11,8 @@ function PosterCard({ graph, id, root }: { graph: FamilyGraph; id: PersonId; roo
   const person = graph.persons.find((p) => p.id === id);
   return (
     <div className={`poster-card${root ? " poster-card--root" : ""}`}>
-      <span className="poster-card__name">{person?.name ?? "—"}</span>
-      {person?.clan && <span className="poster-card__meta">{person.clan}</span>}
-      {person?.origin && <span className="poster-card__meta">{person.origin}</span>}
+      <span className="poster-card__name">{person ? personDisplayName(person) : "—"}</span>
+      {person?.birthPlace && <span className="poster-card__meta">{person.birthPlace}</span>}
     </div>
   );
 }

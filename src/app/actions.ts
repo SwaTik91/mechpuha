@@ -16,6 +16,7 @@ import type {
   FamilyId,
   FamilyKey,
   Person,
+  PersonCardInput,
   PersonId,
   RelativeKind,
   UserId,
@@ -103,7 +104,7 @@ export function makeActions(deps: ActionsDeps) {
       return deps.signSession(user.id, deps.sessionSecret);
     },
 
-    async createFamilyAction(userId: UserId, elder: { name?: string; clan?: string; origin?: string }) {
+    async createFamilyAction(userId: UserId, elder: PersonCardInput) {
       const doc = createFamily(userId, elder);
       deps.saveFamily(doc);
       return doc.id;
@@ -113,7 +114,7 @@ export function makeActions(deps: ActionsDeps) {
       userId: UserId,
       familyId: FamilyId,
       personId: PersonId,
-      card: { name?: string; clan?: string; origin?: string }
+      card: PersonCardInput
     ): Promise<void> {
       const doc = deps.loadFamily(familyId);
       if (!doc) {
@@ -131,7 +132,7 @@ export function makeActions(deps: ActionsDeps) {
       familyId: FamilyId,
       fromId: PersonId,
       kind: RelativeKind,
-      card: { name?: string; clan?: string; origin?: string }
+      card: PersonCardInput
     ): Promise<void> {
       const doc = deps.loadFamily(familyId);
       if (!doc) {

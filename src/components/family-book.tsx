@@ -13,12 +13,12 @@ type FamilyBookProps = {
     familyId: string,
     fromId: PersonId,
     kind: RelativeKind,
-    card: { name: string; clan: string; origin: string }
+    card: { name: string; surname: string; birthPlace: string }
   ) => Promise<{ error?: string }>;
   updatePersonCard: (
     familyId: string,
     personId: PersonId,
-    card: { name: string; clan: string; origin: string }
+    card: { name: string; surname: string; birthPlace: string }
   ) => Promise<{ error?: string }>;
   issueKey: (
     familyId: string,
@@ -90,7 +90,7 @@ export function FamilyBook({ doc, addRelative, updatePersonCard, issueKey }: Fam
   }
 
   function handleSave(
-    card: { name: string; clan: string; origin: string },
+    card: { name: string; surname: string; birthPlace: string },
     kind: RelativeKind
   ) {
     setError(null);
@@ -107,7 +107,7 @@ export function FamilyBook({ doc, addRelative, updatePersonCard, issueKey }: Fam
     });
   }
 
-  function handleEditSave(card: { name: string; clan: string; origin: string }) {
+  function handleEditSave(card: { name: string; surname: string; birthPlace: string }) {
     setError(null);
     startTransition(async () => {
       const result = await updatePersonCard(doc.id, selectedId, card);
@@ -161,8 +161,8 @@ export function FamilyBook({ doc, addRelative, updatePersonCard, issueKey }: Fam
         unavailableKinds={unavailableKinds}
         initialCard={{
           name: selectedPerson?.name ?? "",
-          clan: selectedPerson?.clan ?? "",
-          origin: selectedPerson?.origin ?? "",
+          surname: selectedPerson?.surname ?? "",
+          birthPlace: selectedPerson?.birthPlace ?? "",
         }}
         saving={pending}
         error={error}

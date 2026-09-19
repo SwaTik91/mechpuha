@@ -8,6 +8,13 @@
       "when": 1789773132496,
       "tag": "0000_aspiring_centennial",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789778000000,
+      "tag": "0001_rename_person_fields",
+      "breakpoints": true
     }
   ]
 }

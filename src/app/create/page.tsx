@@ -26,12 +26,12 @@ export default async function CreateFamilyPage({
           <input id="name" name="name" type="text" autoComplete="name" required />
         </div>
         <div className="field">
-          <label htmlFor="clan">Род</label>
-          <input id="clan" name="clan" type="text" />
+          <label htmlFor="surname">Фамилия</label>
+          <input id="surname" name="surname" type="text" />
         </div>
         <div className="field">
-          <label htmlFor="origin">Происхождение старшего</label>
-          <input id="origin" name="origin" type="text" />
+          <label htmlFor="birthPlace">Место рождения</label>
+          <input id="birthPlace" name="birthPlace" type="text" />
         </div>
         <button className="primary" type="submit">Открыть книгу</button>
       </form>
