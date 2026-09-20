@@ -173,8 +173,8 @@ main.shell--wide {
 
 .tree-connectors__line {
   fill: none;
-  stroke: var(--rule);
-  stroke-width: 1.25;
+  stroke: var(--muted);
+  stroke-width: 1.5;
 }
 
 .tree-connectors__label-bg {

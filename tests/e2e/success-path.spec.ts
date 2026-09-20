@@ -47,6 +47,7 @@ test("open register, build two generations, open poster without login", async ({
   await motherForm.getByRole("button", { name: "Сохранить" }).click();
   await expect(page.getByRole("button", { name: /Сара/ })).toBeVisible();
   await expect(page.getByTestId("tree-link-label")).toHaveText(/родители/i);
+  await expect(page.locator(".tree-connectors__line")).toHaveAttribute("d", /M /);
 
   await page.getByRole("button", { name: "Ссылка для старшего" }).click();
   const url = await page.getByTestId("poster-url").innerText();
@@ -58,6 +59,7 @@ test("open register, build two generations, open poster without login", async ({
   await expect(poster.getByText("Рахамим")).toBeVisible();
   await expect(poster.getByText("Сара")).toBeVisible();
   await expect(poster.getByTestId("tree-link-label")).toHaveText(/родители/i);
+  await expect(poster.locator(".tree-connectors__line")).toHaveAttribute("d", /M /);
   await expect(poster.getByText("Сохранить")).toHaveCount(0);
 });
 
