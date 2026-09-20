@@ -98,37 +98,103 @@ a {
 }
 
 main.shell--wide {
-  max-width: 28rem;
+  max-width: 40rem;
+}
+
+.tree-canvas {
+  position: relative;
+  overflow-x: auto;
+  margin: 0 -0.25rem 2rem;
+  padding: 0.25rem;
 }
 
 .generation-tree {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 2rem;
+  gap: 2.75rem;
+  min-width: min-content;
+  padding: 3.25rem 0.5rem 2.75rem;
 }
 
 .tree-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
-  gap: 0.75rem;
+  align-items: flex-start;
+  gap: 1.5rem;
 }
 
 .tree-row--couple {
   align-items: center;
+  position: relative;
+  z-index: 2;
+}
+
+.tree-couple {
+  display: flex;
+  align-items: flex-start;
+  gap: 5.75rem;
 }
 
 .tree-person {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+.tree-row--vacancy {
+  position: absolute;
+  left: 50%;
+  display: flex;
   gap: 0.5rem;
+  transform: translateX(-50%);
+  z-index: 3;
+}
+
+.tree-row--vacancy-parents {
+  bottom: calc(100% + 0.65rem);
+}
+
+.tree-row--vacancy-child {
+  top: calc(100% + 0.65rem);
+}
+
+.tree-connectors {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+}
+
+.tree-connectors__line {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.5;
+}
+
+.tree-connectors__label-bg {
+  fill: var(--paper);
+}
+
+.tree-connectors__label {
+  fill: var(--muted);
+  font-family: system-ui, sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-anchor: middle;
+  dominant-baseline: middle;
 }
 
 .tree-card {
-  background: transparent;
+  position: relative;
+  z-index: 2;
+  background: var(--paper);
   border: 1px solid var(--rule);
   padding: 0.75rem 1rem;
   min-width: 6rem;
@@ -164,7 +230,7 @@ main.shell--wide {
   margin-top: 0.25rem;
 }
 
-.family-book--dimmed .generation-tree,
+.family-book--dimmed .tree-canvas,
 .family-book--dimmed .family-actions,
 .family-book--dimmed h1 {
   opacity: 0.45;
@@ -269,6 +335,9 @@ main.shell--wide {
 }
 
 .poster-card {
+  position: relative;
+  z-index: 2;
+  background: var(--paper);
   border: 1px solid var(--rule);
   padding: 0.75rem 1rem;
   min-width: 6rem;
@@ -298,20 +367,6 @@ main.shell--wide {
   font-size: 12px;
   color: var(--muted);
   margin-top: 0.25rem;
-}
-
-.poster-connector {
-  height: 1rem;
-  border-left: 1px solid var(--rule);
-  width: 0;
-  margin: 0 auto;
-}
-
-.poster-level {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
 }
 
 .invite-accept {

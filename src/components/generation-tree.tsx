@@ -2,7 +2,9 @@
 
 import { hasChild, hasFather, hasMother, hasSpouse, layoutGenerations } from "../domain/layout";
 import { personDisplayName } from "../domain/person";
+import { coupleRowGroups } from "../domain/tree-links";
 import type { FamilyGraph, PersonId, RelativeKind } from "../domain/types";
+import { TreeCanvas } from "./tree-canvas";
 
 type GenerationTreeProps = {
   graph: FamilyGraph;
@@ -28,6 +30,7 @@ function PersonCard({
     <button
       type="button"
       className={`tree-card${selected ? " tree-card--selected" : ""}`}
+      data-person-id={id}
       onClick={onSelect}
     >
       <span className="tree-card__name">{person ? personDisplayName(person) : "—"}</span>
@@ -66,7 +69,7 @@ function PersonWithVacancies({
   return (
     <div className="tree-person">
       {(showFather || showMother) && (
-        <div className="tree-row tree-row--vacancy">
+        <div className="tree-row tree-row--vacancy tree-row--vacancy-parents">
           {showFather && <VacancyCard label="отец" onClick={() => onVacancy(id, "father")} />}
           {showMother && <VacancyCard label="мать" onClick={() => onVacancy(id, "mother")} />}
         </div>
@@ -78,7 +81,7 @@ function PersonWithVacancies({
         )}
       </div>
       {showChild && (
-        <div className="tree-row tree-row--vacancy">
+        <div className="tree-row tree-row--vacancy tree-row--vacancy-child">
           <VacancyCard label="ребёнок" onClick={() => onVacancy(id, "son")} />
         </div>
       )}
@@ -103,16 +106,26 @@ function GenerationRow({
 }) {
   return (
     <div className={`tree-row${root ? " tree-row--root" : ""}`}>
-      {ids.map((id) => (
-        <PersonWithVacancies
-          key={id}
-          graph={graph}
-          id={id}
-          selected={id === selectedId}
-          onSelect={() => onSelect(id)}
-          onVacancy={onVacancy}
-        />
-      ))}
+      {coupleRowGroups(graph, ids).map((group) => {
+        const people = group.map((id) => (
+          <PersonWithVacancies
+            key={id}
+            graph={graph}
+            id={id}
+            selected={id === selectedId}
+            onSelect={() => onSelect(id)}
+            onVacancy={onVacancy}
+          />
+        ));
+        if (group.length === 2) {
+          return (
+            <div key={group.join("-")} className="tree-couple">
+              {people}
+            </div>
+          );
+        }
+        return people[0];
+      })}
     </div>
   );
 }
@@ -127,35 +140,37 @@ export function GenerationTree({
   const { ancestors, rootLevel, descendants } = layoutGenerations(graph, rootId);
 
   return (
-    <div className="generation-tree">
-      {ancestors.map((level, i) => (
+    <TreeCanvas graph={graph} layoutKey={selectedId}>
+      <div className="generation-tree">
+        {ancestors.map((level, i) => (
+          <GenerationRow
+            key={`a-${i}`}
+            graph={graph}
+            ids={level}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            onVacancy={onVacancy}
+          />
+        ))}
         <GenerationRow
-          key={`a-${i}`}
           graph={graph}
-          ids={level}
+          ids={rootLevel}
           selectedId={selectedId}
           onSelect={onSelect}
           onVacancy={onVacancy}
+          root
         />
-      ))}
-      <GenerationRow
-        graph={graph}
-        ids={rootLevel}
-        selectedId={selectedId}
-        onSelect={onSelect}
-        onVacancy={onVacancy}
-        root
-      />
-      {descendants.map((level, i) => (
-        <GenerationRow
-          key={`d-${i}`}
-          graph={graph}
-          ids={level}
-          selectedId={selectedId}
-          onSelect={onSelect}
-          onVacancy={onVacancy}
-        />
-      ))}
-    </div>
+        {descendants.map((level, i) => (
+          <GenerationRow
+            key={`d-${i}`}
+            graph={graph}
+            ids={level}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            onVacancy={onVacancy}
+          />
+        ))}
+      </div>
+    </TreeCanvas>
   );
 }
