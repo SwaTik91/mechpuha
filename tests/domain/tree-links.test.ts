@@ -82,6 +82,17 @@ describe("coupleRowGroups", () => {
 
     expect(coupleRowGroups(g, ["d", spouse.id, "x"])).toEqual([["d", spouse.id], ["x"]]);
   });
+
+  it("pairs a father and mother who share a child even without a spouse link", () => {
+    let g = emptyGraph();
+    g = seedPerson(g, { id: "d", name: "Давид", surname: null, birthPlace: null, claimedUserId: null });
+    g = addRelative(g, "d", "father", { name: "Рахамим" });
+    g = addRelative(g, "d", "mother", { name: "Сара" });
+    const father = g.persons.find((p) => p.name === "Рахамим")!;
+    const mother = g.persons.find((p) => p.name === "Сара")!;
+
+    expect(coupleRowGroups(g, [father.id, mother.id])).toEqual([[father.id, mother.id]]);
+  });
 });
 
 describe("layoutTreeConnectors", () => {
@@ -144,7 +155,7 @@ describe("layoutTreeConnectors", () => {
       ]
     );
 
-    expect(paths[0].d).toBe("M 100 40 L 100 70 L 100 100");
+    expect(paths[0].d).toBe("M 80 40 L 120 40 M 100 40 L 100 70 L 100 100");
     expect(paths[0].label).toEqual({ text: "родители", x: 100, y: 55 });
   });
 });

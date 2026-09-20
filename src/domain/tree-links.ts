@@ -43,6 +43,26 @@ function parentageLabel(roles: Array<ParentRelation["role"]>): ParentageLink["la
   return "родитель";
 }
 
+function childrenOf(graph: FamilyGraph, personId: PersonId): Set<PersonId> {
+  const children = new Set<PersonId>();
+  for (const relation of parentRelations(graph)) {
+    if (relation.parentId === personId) children.add(relation.childId);
+  }
+  return children;
+}
+
+function shareAChild(graph: FamilyGraph, a: PersonId, b: PersonId): boolean {
+  const other = childrenOf(graph, b);
+  for (const childId of childrenOf(graph, a)) {
+    if (other.has(childId)) return true;
+  }
+  return false;
+}
+
+function pairInRowOrder(ids: PersonId[], a: PersonId, b: PersonId): PersonId[] {
+  return ids.indexOf(a) < ids.indexOf(b) ? [a, b] : [b, a];
+}
+
 export function coupleRowGroups(graph: FamilyGraph, ids: PersonId[]): PersonId[][] {
   const used = new Set<PersonId>();
   const groups: PersonId[][] = [];
@@ -51,11 +71,18 @@ export function coupleRowGroups(graph: FamilyGraph, ids: PersonId[]): PersonId[]
     if (used.has(id)) continue;
     const spouseId = getSpouseId(graph, id);
     if (spouseId && ids.includes(spouseId) && !used.has(spouseId)) {
-      const first = ids.indexOf(id) < ids.indexOf(spouseId) ? id : spouseId;
-      const second = first === id ? spouseId : id;
-      groups.push([first, second]);
-      used.add(first);
-      used.add(second);
+      groups.push(pairInRowOrder(ids, id, spouseId));
+      used.add(id);
+      used.add(spouseId);
+      continue;
+    }
+    const coParent = ids.find(
+      (other) => other !== id && !used.has(other) && shareAChild(graph, id, other)
+    );
+    if (coParent) {
+      groups.push(pairInRowOrder(ids, id, coParent));
+      used.add(id);
+      used.add(coParent);
       continue;
     }
     groups.push([id]);
@@ -165,7 +192,14 @@ export function layoutTreeConnectors(links: TreeLink[], boxes: PersonBox[]): Con
     const barY = (startY + childTop) / 2;
     const childCenters = childBoxes.map(boxCenterX);
 
-    const commands: Array<string | number> = ["M", startX, startY, "L", startX, barY];
+    const commands: Array<string | number> = [];
+    if (parentBoxes.length > 1) {
+      const ordered = [...parentBoxes].sort((a, b) => a.x - b.x);
+      const left = ordered[0];
+      const right = ordered[ordered.length - 1];
+      commands.push("M", left.x + left.width, startY, "L", right.x, startY);
+    }
+    commands.push("M", startX, startY, "L", startX, barY);
 
     if (childBoxes.length === 1) {
       const childX = childCenters[0];

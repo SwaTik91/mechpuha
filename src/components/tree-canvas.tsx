@@ -90,7 +90,7 @@ export function TreeCanvas({ graph, layoutKey, children }: TreeCanvasProps) {
                 y={path.label.y}
                 data-testid="tree-link-label"
               >
-                {path.label.text}
+                {path.label.text.toLocaleUpperCase("ru-RU")}
               </text>
             </g>
           );
